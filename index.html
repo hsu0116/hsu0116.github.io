@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>도서를 훔친 범인을 찾아라</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Light blue-gray background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+            background-image: linear-gradient(to bottom right, #a7f3d0, #6ee7b7); /* Light green gradient */
+        }
+        .start-container {
+            background-color: #ffffff;
+            border-radius: 1.5rem; /* More rounded corners */
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            padding: 3rem; /* Increased padding */
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 300px; /* Ensure some height for centering */
+            border: 2px solid #d1fae5; /* Light green border */
+        }
+        .button-glow {
+            transition: all 0.3s ease;
+        }
+        .button-glow:hover {
+            box-shadow: 0 0 20px rgba(52, 211, 153, 0.6); /* Emerald-400 glow */
+            transform: translateY(-3px);
+        }
+    </style>
+</head>
+<body>
+    <div class="start-container">
+        <h1 class="text-5xl md:text-6xl font-extrabold text-gray-800 mb-10 leading-tight tracking-tight">
+            도서를 훔친 범인을 찾아라
+        </h1>
+        <button id="startButton"
+                class="button-glow bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-4 px-10 rounded-full shadow-lg transition duration-300 ease-in-out transform hover:scale-105">
+            시작
+        </button>
+    </div>
+
+    <script>
+        document.getElementById('startButton').addEventListener('click', () => {
+            // 여기에 게임 시작 로직을 추가합니다.
+            // 예를 들어, 다음 방으로 이동하는 함수를 호출하거나,
+            // 게임의 첫 번째 퍼즐이 있는 페이지로 리디렉션할 수 있습니다.
+            alert('게임 시작! 다음 페이지로 이동합니다.'); // 임시 알림
+            // window.location.href = 'game_room1.html'; // 실제 게임 페이지로 이동
+        });
+    </script>
+</body>
+</html>
