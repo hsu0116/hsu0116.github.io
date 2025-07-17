@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>도서를 훔친 범인을 찾아라 - 도서관</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c; /* Dark background for mysterious atmosphere */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+            background-image: linear-gradient(to bottom right, #2d3748, #1a202c); /* Darker gradient */
+            color: #e2e8f0; /* Light text color */
+        }
+        .scene-container {
+            background-color: #2d3748; /* Darker container background */
+            border-radius: 1.5rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+            padding: 3rem;
+            max-width: 700px; /* Wider for image and text */
+            width: 100%;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border: 2px solid #4a5568; /* Subtle border */
+        }
+        .story-text {
+            font-size: 1.25rem; /* Text-xl */
+            line-height: 1.75; /* Leading-relaxed */
+            color: #cbd5e1; /* Light gray text */
+            margin-top: 2.5rem; /* Mt-10 */
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5); /* Subtle text shadow */
+        }
+        .alarm-text {
+            font-size: 1.5rem; /* Text-2xl */
+            font-weight: 700; /* Font-bold */
+            color: #f56565; /* Red-500 for alarm */
+            margin-top: 1.5rem; /* Mt-6 */
+            animation: pulse 1.5s infinite; /* Pulsing alarm effect */
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .next-button {
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        .next-button:hover {
+            box-shadow: 0 0 25px rgba(100, 116, 139, 0.7); /* Slate-400 glow */
+            transform: translateY(-3px);
+        }
+    </style>
+</head>
+<body>
+    <div class="scene-container">
+        <h1 class="text-4xl md:text-5xl font-extrabold text-gray-100 mb-8 tracking-tight">
+            도서관에 갇히다
+        </h1>
+
+        <!-- Image in the center -->
+        <img src="http://googleusercontent.com/file_content/3" alt="도서관 창밖을 보는 돼지 캐릭터"
+             class="rounded-lg shadow-xl w-full max-w-md md:max-w-lg lg:max-w-xl h-auto object-cover border-4 border-gray-600">
+
+        <!-- Storyline -->
+        <p class="story-text">
+            당신은 한적한 오후, 평소처럼 도서관에 입장했습니다.
+            고서적의 냄새와 고요함 속에서 책을 둘러보던 그때,
+            갑자기 도서관 입구가 '쿵' 소리와 함께 닫히면서 붉은 경보등이 번쩍이고 날카로운 사이렌 소리가 울려 퍼집니다.
+        </p>
+        <p class="alarm-text">
+            "경고! 도서가 도난당했습니다. 경고! 도서가 도난당했습니다."
+        </p>
+        <p class="story-text mt-6">
+            당신은 도서관 안에 갇혔습니다. 범인을 찾고 탈출해야 합니다!
+        </p>
+
+        <!-- Placeholder for next action -->
+        <button id="nextButton"
+                class="next-button bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 px-8 rounded-full mt-10 text-lg">
+            다음 단서 찾기
+        </button>
+    </div>
+
+    <script>
+        document.getElementById('nextButton').addEventListener('click', () => {
+            // 여기에 다음 방으로 이동하는 로직을 추가합니다.
+            // 예: alert('다음 퍼즐이 있는 곳으로 이동합니다!');
+            // window.location.href = 'puzzle_room1.html'; // 다음 HTML 파일로 이동
+        });
+    </script>
+</body>
+</html>
