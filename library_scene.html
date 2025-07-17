@@ -48,7 +48,7 @@
             margin-top: 1.5rem; /* Mt-6 */
             animation: pulse 1.5s infinite; /* Pulsing alarm effect */
         }
-        @keyframes pulse {
+        @keyframes pulse { /* @keyframes 키워드 추가 */
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
         }
@@ -101,7 +101,8 @@
         document.getElementById('nextButton').addEventListener('click', () => {
             // 여기에 다음 방으로 이동하는 로직을 추가합니다.
             // 예: alert('다음 퍼즐이 있는 곳으로 이동합니다!');
-            window.location.href = 'suspects_puzzle.html'; // 다음 HTML 파일로 이동
+            // 'suspects_puzzle.html'이 웹사이트의 루트 디렉토리에 있다고 가정하고 절대 경로를 사용합니다.
+            window.location.href = window.location.origin + '/suspects_puzzle.html';
         });
     </script>
 </body>
