@@ -199,7 +199,7 @@
         </p>
 
         <p class="final-question">
-            그러나 진범은 따로 있어. 너는 누가 진범인지 알지? 진범은 누구야?
+            그러나 진범은 따로 있어. 진짜 일기의 주인..너는 누가 진범인지 알지? 진범은 누구야?
         </p>
 
         <div class="flex flex-col items-center space-y-4 mt-6 w-full max-w-sm">
@@ -214,11 +214,7 @@
         <p id="feedbackMessage" class="story-text mt-6 font-bold" style="display: none;"></p>
         <p id="finalRevealMessage" class="shocking-reveal" style="display: none;"></p>
         <p id="endGameMessage" class="end-message" style="display: none;"></p>
-        <button id="resetButton"
-                class="button-glow bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg mt-8 transition duration-300 ease-in-out transform hover:scale-105"
-                style="display: none;">
-            처음으로 돌아가기
-        </button>
+
     </div>
 
     <script>
@@ -278,7 +274,7 @@
 
         resetButton.addEventListener('click', () => {
             // 게임 초기 화면으로 돌아가거나 새로고침
-            window.location.href = window.location.origin; // 첫 페이지로 이동
+            window.location.href = window.location.origin + '/love.html';
         });
     </script>
 </body>
