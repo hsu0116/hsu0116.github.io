@@ -256,12 +256,13 @@
                     setTimeout(() => {
                         endGameMessage.innerHTML = "당신은 도서관 문을 일찍 닫고 남자친구와 데이트를 하기 위해서, 도서관 책을 훔치고 다른 이들에게 죄를 뒤집어씌웠던 것입니다. 이 모든 퍼즐은 당신이 꾸민 자작극이었죠...<br><br>성공적인 도주를 축하합니다!";
                         endGameMessage.style.display = 'block';
-                    }, 3000); // 3초 후 엔딩 메시지 및 리셋 버튼 표시
+                        // endGameMessage가 표시된 후 3초 뒤에 다음 페이지로 이동
+                        setTimeout(() => {
+                            window.location.href = window.location.origin + '/love.html';
+                        }, 5000);
+                    }, 3000); // endGameMessage가 나타나는 딜레이
 
-                    
-                }, 2000); // 2초 후 최종 반전 메시지 표시
-            window.location.href = window.location.origin + '/love.html';
-
+                }, 2000); // finalRevealMessage가 나타나는 딜레이
 
             } else {
                 feedbackMessage.textContent = "틀렸어. 다시 생각해봐.";
