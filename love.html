@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>도서를 훔친 범인을 찾아라 - 최종 엔딩</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c; /* Dark background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+            background-image: linear-gradient(to bottom right, #2d3748, #1a202c);
+            color: #e2e8f0;
+        }
+        .ending-container {
+            background-color: #2d3748;
+            border-radius: 1.5rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+            padding: 3rem;
+            max-width: 700px;
+            width: 100%;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border: 2px solid #a78bfa; /* Purple border for a softer ending */
+            animation: fadeIn 1.5s ease-out forwards;
+        }
+        .ending-title {
+            font-size: 3.5rem; /* Large title */
+            font-weight: 800;
+            color: #facc15; /* Yellow for warmth */
+            margin-bottom: 2rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.7);
+        }
+        .ending-text {
+            font-size: 1.5rem;
+            line-height: 1.8;
+            color: #cbd5e1;
+            margin-bottom: 2.5rem;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+        .main-message {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: #f87171; /* Red for love/impact */
+            margin-top: 2rem;
+            margin-bottom: 3rem;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.8);
+            animation: pulseText 2s infinite alternate;
+        }
+        .sub-message {
+            font-size: 1.25rem;
+            color: #a78bfa; /* Purple for tenderness */
+            margin-bottom: 2rem;
+            line-height: 1.6;
+        }
+        .button-glow {
+            transition: all 0.3s ease;
+        }
+        .button-glow:hover {
+            box-shadow: 0 0 20px rgba(167, 139, 250, 0.6); /* Purple glow */
+            transform: translateY(-3px);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes pulseText {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.03); }
+            100% { transform: scale(1); }
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 640px) {
+            .ending-container {
+                padding: 2rem;
+            }
+            .ending-title {
+                font-size: 2.5rem;
+            }
+            .ending-text {
+                font-size: 1.2rem;
+            }
+            .main-message {
+                font-size: 2rem;
+            }
+            .sub-message {
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="ending-container">
+        <h1 class="ending-title">게임 종료</h1>
+
+        <p class="ending-text">
+            당신은 완벽한 자작극으로 모두를 속였습니다.<br>
+            이 사서는 억울하게 잡혀갔고, 당신의 계획은 성공했습니다.
+        </p>
+
+        <p class="ending-text font-bold text-red-400">
+            하지만... 사실 당신의 죄목이 더 있는데...
+            바로 내 마음 절도죄!
+        </p>
+
+        <p class="main-message">
+            100일 동안 사귀어줘서 고마워! ❤️ 
+        </p>
+
+        <p class="sub-message">
+            수경<br>
+            앞으로도 우리 예쁜 사랑 계속 이어나가자!
+        </p>
+
+        <button id="restartButton"
+                class="button-glow bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg transition duration-300 ease-in-out transform hover:scale-105">
+            처음으로 돌아가기
+        </button>
+    </div>
+
+    <script>
+        document.getElementById('restartButton').addEventListener('click', () => {
+            // 게임 초기 화면으로 돌아가거나 새로고침
+            window.location.href = window.location.origin; // 첫 페이지로 이동
+        });
+    </script>
+</body>
+</html>
