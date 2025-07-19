@@ -145,21 +145,21 @@
 
         <div class="statement-grid grid grid-cols-1 gap-4 mt-8 w-full">
             <div class="suspect-statement-card">
-                <p class="suspect-statement-name">박 제비</p>
-                <p class="statement-text">"나는 이 사서보다 나중에 왔어. 그리고 내가 도착했을 때, 도서관에는 이미 세 명이 있었어."</p>
+                <p class="suspect-statement-name">박제비</p>
+                <p class="statement-text">"나는 이사서보다 나중에 왔어. 그리고 내가 도착했을 때, 도서관에는 이미 세 명이 있었어."</p>
             </div>
             <div class="suspect-statement-card">
-                <p class="suspect-statement-name">이 사서</p>
-                <p class="statement-text">"나는 김 손님보다 먼저 왔지만, 왕 교감보다는 늦게 왔어. 나보다 늦게 온 사람은 딱 두 명이야."</p>
+                <p class="suspect-statement-name">이사서</p>
+                <p class="statement-text">"나는 김손님보다 먼저 왔지만, 왕교감보다는 늦게 왔어. 나보다 늦게 온 사람은 딱 두 명이야."</p>
             </div>
             <div class="suspect-statement-card">
-                <p class="suspect-statement-name">왕 교감</p>
+                <p class="suspect-statement-name">왕교감</p>
                 <p class="statement-text">"내가 도서관에 도착하니까 이미 1교시는 끝나가고 있었어"</p>
             </div>
         </div>
 
         <p class="story-text mt-8 font-semibold">
-            도서관에 입장한 순서대로 다섯 명의 이름을 입력하세요.<br>(예: 홍길동, 이순신, ... )
+            도서관에 입장한 순서대로 다섯 명의 이름을 입력하세요.<br>(예: 김손님, 최학생, 왕교감, 박제비, 이사서)
         </p>
 
         <div class="flex flex-col items-center space-y-4 mt-6 w-full max-w-sm">
@@ -189,7 +189,7 @@
         const feedbackMessage = document.getElementById('feedbackMessage');
 
         // 정답 순서 (추리 결과): 김 손님, 최 학생, 이 사서, 박 제비, 왕 교감
-        const correctOrder = ["김 손님", "최 학생", "이 사서", "박 제비", "왕 교감"];
+        const correctOrder = ["최학생", "왕교감", "이사서", "박제비", "김손님"];
 
         submitOrderButton.addEventListener('click', checkOrder);
         answerInputs.forEach(input => {
