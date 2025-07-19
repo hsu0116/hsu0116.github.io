@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>도서를 훔친 범인을 찾아라 - 최종 단서 발견</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c; /* Dark background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+            background-image: linear-gradient(to bottom right, #2d3748, #1a202c);
+            color: #e2e8f0;
+        }
+        .puzzle-container {
+            background-color: #2d3748;
+            border-radius: 1.5rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+            padding: 3rem;
+            max-width: 800px;
+            width: 100%;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border: 2px solid #4a5568;
+        }
+        .story-text {
+            font-size: 1.125rem; /* Text-lg */
+            line-height: 1.75;
+            color: #cbd5e1;
+            margin-top: 1.5rem;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+        .dialogue-box {
+            background-color: #3a475a; /* Slightly lighter dark background for dialogue */
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            text-align: left;
+            width: 90%;
+            max-width: 600px;
+        }
+        .dialogue-speaker {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #fbd38d; /* Light orange for speaker name */
+            margin-bottom: 0.5rem;
+        }
+        .dialogue-text {
+            font-size: 1.25rem; /* Text-xl */
+            line-height: 1.6;
+            color: #e2e8f0;
+        }
+        .clue-image {
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.1);
+            margin-top: 2.5rem;
+            border: 3px solid #6366f1; /* Indigo border for emphasis */
+            width: 100%;
+            max-width: 400px; /* Max width for the book image */
+            height: auto;
+            object-fit: contain;
+            animation: pulse 1.5s infinite alternate; /* 펄스 애니메이션 추가 */
+        }
+        /* 새로운 미스디렉션 이미지 스타일 */
+        .misdirection-image {
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.1);
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+            border: 3px solid #fbd38d; /* Light orange border for emphasis */
+            width: 100%;
+            max-width: 300px; /* Adjust max-width for the image */
+            height: auto;
+            object-fit: contain;
+        }
+        @keyframes pulse {
+            from { transform: scale(1); box-shadow: 0 0 15px #6366f1, 0 0 30px #6366f1; }
+            to { transform: scale(1.03); box-shadow: 0 0 25px #6366f1, 0 0 50px #6366f1; }
+        }
+        .next-button {
+            background-color: #10B981; /* Green-500 */
+            transition: all 0.3s ease;
+        }
+        .next-button:hover {
+            background-color: #059669; /* Green-600 */
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.6); /* Green glow */
+            transform: translateY(-3px);
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 640px) {
+            .puzzle-container {
+                padding: 2rem;
+            }
+            .dialogue-box {
+                padding: 1rem;
+                margin-top: 0.75rem;
+                margin-bottom: 0.75rem;
+            }
+            .dialogue-text {
+                font-size: 1.1rem;
+            }
+            .clue-image, .misdirection-image {
+                margin-top: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="puzzle-container">
+        <h1 class="text-4xl md:text-5xl font-extrabold text-gray-100 mb-6 tracking-tight">
+            진실을 향한 논쟁
+        </h1>
+
+        <p class="story-text mb-4 text-center">
+            최 학생의 충격적인 진술에 도서관 안의 모든 용의자들이 술렁이기 시작했습니다.
+            '빨리 쉬고 싶다'는 말에 모두가 서로를 의심하며 날카로운 시선을 주고받습니다.
+        </p>
+
+        <!-- 대화 시작 -->
+        <div class="dialogue-box">
+            <p class="dialogue-speaker">왕교감:</p>
+            <p class="dialogue-text">"쉬는 날이 빨리 왔으면 좋겠다고? 혹시 책을 훔쳐서 도서관 문을 닫고 쉬려는 이사서 당신이 범인 아니야?"</p>
+        </div>
+        <div class="dialogue-box">
+            <p class="dialogue-speaker">이 사서:</p>
+            <p class="dialogue-text">"무슨 말씀이세요! 저는 그저 평범한 사서일 뿐입니다! 오히려 박제비 씨도 책 배달 안 해도 되니 쉴 거 아닌가요?"</p>
+        </div>
+        <div class="dialogue-box">
+            <p class="dialogue-speaker">박제비:</p>
+            <p class="dialogue-text">"저, 저는 그저 배달만 왔을 뿐인데요! 그런데 김손님은 아까부터 왜 그렇게 몸을 떨어요? 당신이 훔친 거 아냐?"</p>
+        </div>
+        <div class="dialogue-box">
+            <p class="dialogue-speaker">김 손님:</p>
+            <p class="dialogue-text">"아뇨! 이건 저번 휴가 때 놀다가 감기에 걸려서 추워서 그런 거예요!"</p>
+        </div>
+
+        <div class="dialogue-box">
+            <p class="dialogue-speaker">주인공:</p>
+            <p class="dialogue-text">"진정하세요, 여러분. 누구든지 범인은 될 수 있습니다. 지금은 서로 싸우기보다는 협력해서 진실을 밝혀야 합니다."</p>
+        </div>
+
+        <p class="story-text mt-6 font-semibold">
+            모두가 혼란에 빠져있는 그때, 김손님이 갑자기 소리쳤습니다.
+        </p>
+
+        <!-- 개구리 왕자 책 이미지 -->
+        <img src="https://placehold.co/400x300/8BC34A/FFFFFF?text=개구리+왕자+책" alt="바닥에 떨어진 개구리 왕자 책"
+             class="clue-image">
+
+        <p class="story-text mt-6 font-bold text-yellow-400">
+            "어... 저 책... 개구리 왕자잖아!"
+        </p>
+
+        <button id="nextStepButton"
+                class="next-button text-white font-bold py-3 px-8 rounded-lg shadow-lg mt-8 transition duration-300 ease-in-out transform hover:scale-105">
+            다음 단계로
+        </button>
+    </div>
+
+    <script>
+        const nextStepButton = document.getElementById('nextStepButton');
+
+        nextStepButton.addEventListener('click', () => {
+            // 최종 반전 페이지로 이동
+            // 여기에 최종 반전 페이지의 HTML 파일 이름을 넣어주세요. (예: 'final_reveal_page.html')
+            // alert('개구리 왕자 책을 발견했습니다! 이제 모든 진실이 밝혀질 시간입니다.'); // 임시 알림
+            // window.location.href = window.location.origin + '/final_reveal_page.html';
+        });
+    </script>
+</body>
+</html>
