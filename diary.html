@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>도서를 훔친 범인을 찾아라 - 찢어진 일기</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c; /* Dark background */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+            background-image: linear-gradient(to bottom right, #2d3748, #1a202c);
+            color: #e2e8f0;
+        }
+        .puzzle-container {
+            background-color: #2d3748;
+            border-radius: 1.5rem;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+            padding: 3rem;
+            max-width: 800px;
+            width: 100%;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border: 2px solid #4a5568;
+        }
+        .story-text {
+            font-size: 1.125rem; /* Text-lg */
+            line-height: 1.75;
+            color: #cbd5e1;
+            margin-top: 1.5rem;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+        .diary-image {
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.1);
+            margin-top: 2.5rem;
+            border: 3px solid #fbd38d; /* Light orange border for emphasis */
+            width: 100%;
+            max-width: 500px; /* Max width for the diary image */
+            height: auto;
+            object-fit: contain;
+        }
+        .diary-entry {
+            background-color: #3a475a; /* Slightly lighter dark background for entries */
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin-top: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            text-align: left;
+            width: 90%;
+            max-width: 600px;
+        }
+        .entry-date {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #a0aec0; /* Light blue-gray for date */
+            margin-bottom: 1rem;
+        }
+        .entry-line {
+            font-size: 1.25rem; /* Text-xl */
+            line-height: 1.6;
+            color: #e2e8f0;
+            margin-bottom: 0.5rem;
+        }
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px; /* Gap between input fields */
+            margin-top: 20px;
+        }
+        .input-field {
+            width: 100%;
+            max-width: 300px; /* Max width for each input field */
+            padding: 12px;
+            border: 2px solid #6366f1; /* Indigo border */
+            border-radius: 8px;
+            background-color: #334155; /* Slate-700 background */
+            color: #e2e8f0;
+            font-size: 1rem;
+            text-align: center;
+        }
+        .input-field::placeholder {
+            color: #94a3b8; /* Slate-400 placeholder */
+        }
+        .input-field:focus {
+            outline: none;
+            border-color: #818cf8; /* Lighter indigo on focus */
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.4);
+        }
+        .button-glow {
+            transition: all 0.3s ease;
+        }
+        .button-glow:hover {
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.6); /* Indigo glow */
+            transform: translateY(-3px);
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 640px) {
+            .puzzle-container {
+                padding: 2rem;
+            }
+            .diary-entry {
+                padding: 1rem;
+                margin-top: 1.5rem;
+                margin-bottom: 1.5rem;
+            }
+            .entry-line {
+                font-size: 1.1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="puzzle-container">
+        <h1 class="text-4xl md:text-5xl font-extrabold text-gray-100 mb-6 tracking-tight">
+            찢어진 일기 조각
+        </h1>
+
+        <p class="story-text mb-4 text-center">
+            '개구리 왕자' 책을 발견하고 열어보니, 그 안에서 낡고 찢어진 일기 조각이 떨어졌습니다.
+            일부는 손상되어 있지만, 남아있는 내용에서 중요한 단서를 얻을 수 있을 것 같습니다.
+        </p>
+
+        <img id="diaryImage" src="http://googleusercontent.com/image_generation_content/4" alt="찢어진 일기 이미지"
+             class="diary-image">
+
+        <p class="story-text mt-6 font-semibold">
+            일기에는 다음과 같은 내용이 남아있었습니다.
+        </p>
+
+        <div class="diary-entry">
+            <p class="entry-date">2025년 4월 12일 (날씨: 바람 많이 붐)</p>
+            <p class="entry-line">"_______에서 만났다."</p>
+            <p class="entry-line">"_______색 옷을 입고 나갔다."</p>
+            <p class="entry-line">"_______사과샐러드롤이랑 초밥을 먹었다."</p>
+            <p class="entry-line">"..."</p>
+        </div>
+
+        <p class="story-text mt-6 font-bold text-yellow-400">
+            일기 속 빈칸에 들어갈 내용을 순서대로 입력하여 일기를 완성하고 범인의 '진정한 목적'을 파악하세요.
+        </p>
+
+        <div class="flex flex-col items-center space-y-4 mt-6 w-full max-w-sm">
+            <input type="text" id="answerInput1" placeholder="첫 번째 빈칸 (장소)" class="input-field">
+            <input type="text" id="answerInput2" placeholder="두 번째 빈칸 (색깔)" class="input-field">
+            <input type="text" id="answerInput3" placeholder="세 번째 빈칸 (음식 재료)" class="input-field">
+            <button id="submitButton"
+                    class="button-glow bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg transition duration-300 ease-in-out transform hover:scale-105">
+                제출
+            </button>
+        </div>
+
+        <p id="feedbackMessage" class="story-text mt-6 font-bold" style="display: none;"></p>
+    </div>
+
+    <script>
+        const answerInput1 = document.getElementById('answerInput1');
+        const answerInput2 = document.getElementById('answerInput2');
+        const answerInput3 = document.getElementById('answerInput3');
+        const submitButton = document.getElementById('submitButton');
+        const feedbackMessage = document.getElementById('feedbackMessage');
+        const diaryImage = document.getElementById('diaryImage');
+
+        // 정답: 스시미라이, 하양 또는 하얀, 연어
+        const correctAnswers = ["스시미라이", ["하양", "하얀"], "연어"];
+
+        submitButton.addEventListener('click', checkAnswers);
+        [answerInput1, answerInput2, answerInput3].forEach(input => {
+            input.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    checkAnswers();
+                }
+            });
+        });
+
+        function checkAnswers() {
+            const userAnswer1 = answerInput1.value.trim();
+            const userAnswer2 = answerInput2.value.trim();
+            const userAnswer3 = answerInput3.value.trim();
+
+            feedbackMessage.style.display = 'none';
+
+            let isCorrect = true;
+
+            // Check first answer
+            if (userAnswer1 !== correctAnswers[0]) {
+                isCorrect = false;
+            }
+
+            // Check second answer (allow both "하양" and "하얀")
+            if (!correctAnswers[1].includes(userAnswer2)) {
+                isCorrect = false;
+            }
+
+            // Check third answer
+            if (userAnswer3 !== correctAnswers[2]) {
+                isCorrect = false;
+            }
+
+            if (isCorrect) {
+                feedbackMessage.textContent = "정답입니다! 진실이 밝혀질 시간입니다...";
+                feedbackMessage.style.color = '#10B981'; // Green-500
+                feedbackMessage.style.display = 'block';
+
+                answerInput1.disabled = true;
+                answerInput2.disabled = true;
+                answerInput3.disabled = true;
+                submitButton.disabled = true;
+
+                setTimeout(() => {
+                    // 최종 반전 페이지로 이동
+                    window.location.href = window.location.origin + '/final_reveal.html';
+                }, 2000);
+            } else {
+                feedbackMessage.textContent = "오답입니다! 일기 내용을 다시 꼼꼼히 살펴보세요.";
+                feedbackMessage.style.color = '#EF4444'; // Red-500
+                feedbackMessage.style.display = 'block';
+                answerInput1.value = '';
+                answerInput2.value = '';
+                answerInput3.value = '';
+                answerInput1.focus(); // 첫 번째 입력 필드에 포커스
+            }
+        }
+
+        // 이미지 로드 (이전 대화에서 생성된 이미지 URL 사용)
+        diaryImage.src = "http://googleusercontent.com/image_generation_content/4";
+
+        // 사용자가 입력 필드에 다시 입력하기 시작하면 피드백 메시지 숨기기
+        [answerInput1, answerInput2, answerInput3].forEach(input => {
+            input.addEventListener('input', () => {
+                if (feedbackMessage.style.display === 'block' && feedbackMessage.textContent.includes("오답입니다")) {
+                    feedbackMessage.style.display = 'none';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
