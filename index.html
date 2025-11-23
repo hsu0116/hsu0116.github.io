@@ -111,6 +111,11 @@
             disableLobbyActions(); // 초기에는 모두 비활성화
 
             try {
+                // 추가된 디버그 로그
+                console.log("App ID:", appId);
+                console.log("Initial Auth Token Available:", !!initialAuthToken);
+                console.log("Parsed Firebase Config:", firebaseConfig); // 설정 값 확인
+                
                 // Firebase Config 유효성 검사 강화
                 if (!firebaseConfig || !firebaseConfig.apiKey || !firebaseConfig.projectId) {
                     authStatusEl.textContent = '❌ Firebase 설정 오류: API 키 또는 Project ID가 없습니다.';
