@@ -56,11 +56,22 @@
             <p id="secret-error" class="text-error text-sm hidden">4자리, 중복 없는 숫자를 입력해 주세요.</p>
         </div>
 
-        <!-- 상대방 비밀 숫자 설정 영역 안내 -->
-        <div id="opponent-secret-setup-area" class="space-y-4 hidden border-t pt-4">
-            <h2 class="text-xl font-semibold text-primary">상대방 비밀 숫자 설정 안내</h2>
-            <p id="opponent-secret-status" class="text-gray-600">상대방 Player 1의 숫자가 설정되기를 기다리고 있습니다.</p>
-            <p class="text-xs text-red-500">로컬 모드이므로, 게임을 계속하려면 상대방 역할로 다시 접속하여 숫자를 입력해야 합니다.</p>
+        <!-- 상대방 비밀 숫자 설정 영역 안내 / 로컬 테스트 헬퍼 (수정됨) -->
+        <div id="opponent-secret-setup-area" class="space-y-4 hidden border-t pt-4 p-4 bg-yellow-50 rounded-lg shadow-inner">
+            <h2 id="opponent-setup-title" class="text-xl font-semibold text-primary">로컬 테스트: 상대방 숫자 설정 헬퍼</h2>
+            <p id="opponent-secret-status" class="text-gray-600 text-sm">
+                로컬 모드에서는 상대방 역할을 대신하여 숫자를 설정해야 게임이 시작됩니다. 
+                아래에 상대방의 비밀 숫자를 입력하여 설정을 완료하세요.
+            </p>
+            <div id="opponent-setup-input-group" class="flex space-x-2">
+                <input type="text" id="opponent-secret-input" maxlength="4" placeholder="상대방 비밀 숫자 (예: 9876)"
+                       class="flex-grow p-3 border border-gray-300 rounded-lg text-lg text-center">
+                <button id="set-opponent-secret-btn" disabled 
+                        class="bg-blue-500 text-white py-3 px-6 rounded-lg font-bold hover:bg-blue-600 transition disabled:bg-gray-400">
+                    상대방 숫자 확정
+                </button>
+            </div>
+            <p id="opponent-secret-error" class="text-error text-sm hidden"></p>
         </div>
 
         <!-- 게임 로그 영역 -->
@@ -115,8 +126,15 @@
         const submitGuessBtn = document.getElementById('submit-guess-btn');
         const guessErrorEl = document.getElementById('guess-error');
         const backToLobbyBtn = document.getElementById('back-to-lobby-btn');
+
+        // 로컬 테스트 헬퍼 관련 요소
         const opponentSecretSetupArea = document.getElementById('opponent-secret-setup-area');
+        const opponentSetupTitle = document.getElementById('opponent-setup-title');
         const opponentSecretStatusEl = document.getElementById('opponent-secret-status');
+        const opponentSetupInputGroup = document.getElementById('opponent-setup-input-group');
+        const opponentSecretInput = document.getElementById('opponent-secret-input');
+        const setOpponentSecretBtn = document.getElementById('set-opponent-secret-btn');
+        const opponentSecretErrorEl = document.getElementById('opponent-secret-error');
 
 
         if (gameId !== 'LOCAL_DUO_GAME' || !playerNickname || !myRole) {
@@ -223,17 +241,47 @@
                 gameData.player2_secret = secret;
             }
 
-            // 두 플레이어 모두 비밀 숫자를 설정했는지 확인
-            if (gameData.player1_secret && gameData.player2_secret) {
-                gameData.status = 'IN_PROGRESS';
-                gameData.turn = 'P1'; // P1 선공
-            }
+            // 두 플레이어 모두 비밀 숫자를 설정했는지 확인 -> 이 단계에서는 아직 체크하지 않고, 상대방 헬퍼에서 처리
             
             saveGameData();
             updateGameUI();
         });
 
-        // 2. 추측 제출 핸들러 (로컬 업데이트)
+        // 2. 상대방 비밀 숫자 설정 헬퍼 핸들러 (로컬 업데이트)
+        function handleSetOpponentSecret() {
+            const secret = opponentSecretInput.value.trim();
+            if (!isValidSecret(secret)) {
+                opponentSecretErrorEl.textContent = `${DIGIT_COUNT}자리, 중복 없는 숫자를 입력해 주세요.`;
+                opponentSecretErrorEl.classList.remove('hidden');
+                return;
+            }
+
+            // 내 비밀 숫자와 중복되는지 확인 (불가능하도록)
+            const mySecret = myRole === 'P1' ? gameData.player1_secret : gameData.player2_secret;
+            if (mySecret === secret) {
+                 opponentSecretErrorEl.textContent = `나의 비밀 숫자와 동일한 숫자를 설정할 수 없습니다.`;
+                 opponentSecretErrorEl.classList.remove('hidden');
+                 return;
+            }
+
+            opponentSecretErrorEl.classList.add('hidden');
+
+            // 상대방 역할에 따라 비밀 숫자 저장
+            if (myRole === 'P1') {
+                gameData.player2_secret = secret; // 내가 P1이면 P2의 숫자를 설정
+            } else { // P2
+                gameData.player1_secret = secret; // 내가 P2이면 P1의 숫자를 설정
+            }
+
+            // 두 플레이어 모두 비밀 숫자를 설정했으므로 게임 시작
+            gameData.status = 'IN_PROGRESS';
+            gameData.turn = 'P1'; // P1 선공
+            
+            saveGameData();
+            updateGameUI();
+        }
+
+        // 3. 추측 제출 핸들러 (로컬 업데이트)
         function handleSubmitGuess() {
             const guess = guessInput.value.trim();
             if (!isValidSecret(guess)) {
@@ -283,7 +331,7 @@
             guessInput.value = ''; // 입력 필드 초기화
         }
 
-        // 3. UI 업데이트 로직 (핵심)
+        // 4. UI 업데이트 로직 (핵심)
         function updateGameUI() {
             let mySecretSet = (myRole === 'P1' ? gameData.player1_secret : gameData.player2_secret) !== null;
             let opponentSecretSet = (myRole === 'P1' ? gameData.player2_secret : gameData.player1_secret) !== null;
@@ -297,9 +345,7 @@
                     matchStatusEl.textContent = `당신의 비밀 숫자를 설정해 주세요.`;
                 } else if (!opponentSecretSet) {
                     matchStatusEl.className = 'font-bold text-gray-800';
-                    matchStatusEl.textContent = `${opponentNickname} (${opponentRole})의 숫자가 설정되기를 기다리는 중...`;
-                } else {
-                    // Should not happen if logic is correct
+                    matchStatusEl.textContent = `상대방 (${opponentNickname})의 숫자가 설정되기를 기다리는 중...`;
                 }
             } else if (gameData.status === 'IN_PROGRESS') {
                 matchStatusEl.className = 'font-bold text-accent';
@@ -368,24 +414,47 @@
                 logsEl.innerHTML = `<p class="text-gray-600">게임을 시작하려면 비밀 숫자를 설정해야 합니다.</p>`;
             }
 
-            // 5. 로컬 모드에서 상대방의 행동을 시뮬레이션하도록 안내
-            if (gameData.status === 'IN_PROGRESS' && gameData.turn !== myRole) {
+            // 5. 상대방 설정/차례 안내 영역 관리
+            
+            // 5-1. SETUP 단계: 내 숫자는 설정했고, 상대방 숫자가 없을 때 -> 헬퍼 표시
+            if (gameData.status === 'SETUP' && mySecretSet && !opponentSecretSet) {
                 opponentSecretSetupArea.classList.remove('hidden');
-                opponentSecretStatusEl.textContent = `현재는 ${opponentNickname} (${opponentRole})의 차례입니다. 게임을 계속하려면 로비로 돌아가 ${opponentNickname}의 역할로 다시 접속하세요.`;
-            } else if (gameData.status === 'SETUP' && !opponentSecretSet) {
-                 opponentSecretSetupArea.classList.remove('hidden');
-                 opponentSecretStatusEl.textContent = `${opponentNickname} (${opponentRole})의 비밀 숫자가 설정되기를 기다리고 있습니다. 로비로 돌아가 ${opponentNickname}의 역할로 접속하여 숫자를 설정해야 합니다.`;
-            } else {
+                opponentSecretSetupArea.classList.add('bg-yellow-50');
+                opponentSetupTitle.textContent = '로컬 테스트: 상대방 숫자 설정 헬퍼';
+                opponentSecretStatusEl.textContent = `로컬 모드에서는 상대방 역할(${opponentRole})을 대신하여 숫자를 설정해야 게임이 시작됩니다.`;
+                opponentSetupInputGroup.style.display = 'flex';
+                opponentSecretInput.disabled = false;
+                setOpponentSecretBtn.disabled = !isValidSecret(opponentSecretInput.value.trim());
+                opponentSecretErrorEl.style.display = 'block';
+
+            } 
+            // 5-2. IN_PROGRESS 단계: 상대방 차례일 때 -> 대기 안내 표시
+            else if (gameData.status === 'IN_PROGRESS' && gameData.turn !== myRole) {
+                opponentSecretSetupArea.classList.remove('hidden');
+                opponentSecretSetupArea.classList.remove('bg-yellow-50');
+                opponentSetupTitle.textContent = '상대방 차례 안내';
+                opponentSecretStatusEl.textContent = `현재는 ${opponentNickname} (${opponentRole})의 차례입니다. 게임을 계속하려면 로비로 돌아가 ${opponentRole}로 접속하여 추측을 진행하세요.`;
+                opponentSetupInputGroup.style.display = 'none'; // 헬퍼 입력 숨김
+                opponentSecretErrorEl.style.display = 'none'; // 에러 숨김
+            } 
+            // 5-3. 그 외 (내 숫자도 설정 안 됐거나, 게임 끝났거나, 내 차례일 때) -> 숨김
+            else {
                 opponentSecretSetupArea.classList.add('hidden');
             }
         }
         
         // --- 초기화 및 리스너 연결 ---
         
-        // 비밀 숫자 입력 시 버튼 활성화/비활성화
+        // 비밀 숫자 입력 시 버튼 활성화/비활성화 (내 비밀 숫자)
         secretInput.addEventListener('input', () => {
             setSecretBtn.disabled = !isValidSecret(secretInput.value.trim());
             secretErrorEl.classList.add('hidden');
+        });
+
+        // 상대방 비밀 숫자 입력 시 버튼 활성화/비활성화 (로컬 헬퍼)
+        opponentSecretInput.addEventListener('input', () => {
+            setOpponentSecretBtn.disabled = !isValidSecret(opponentSecretInput.value.trim());
+            opponentSecretErrorEl.classList.add('hidden');
         });
 
         // 추측 입력 시 버튼 활성화/비활성화
@@ -399,6 +468,9 @@
         // 추측 제출 버튼 리스너 연결
         submitGuessBtn.addEventListener('click', handleSubmitGuess);
         
+        // 상대방 비밀 숫자 설정 버튼 리스너 연결
+        setOpponentSecretBtn.addEventListener('click', handleSetOpponentSecret);
+
         // 로비로 돌아가기 버튼 (로컬 스토리지 데이터 초기화)
         backToLobbyBtn.addEventListener('click', () => {
              // 현재 게임 세션 데이터만 삭제하고 로비로 이동
