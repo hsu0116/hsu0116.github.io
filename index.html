@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>⚾️ 2인 숫자 야구 - 시작 (로컬 모드)</title>
+    <title>⚾️ 2인 숫자 야구 - 실시간 로비</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -17,6 +17,7 @@
                         'primary': '#2c3e50',
                         'secondary': '#3498db',
                         'accent': '#2ecc71',
+                        'error': '#e74c3c'
                     }
                 }
             }
@@ -27,95 +28,266 @@
 
     <div id="app-container" class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md space-y-6">
         <h1 class="text-3xl font-bold text-center text-primary">
-            ⚾️ 2인 숫자 야구 (로컬 테스트)
+            ⚾️ 2인 숫자 야구 (실시간)
         </h1>
         <p class="text-center text-gray-500 mb-6">
-            함께 플레이할 이름과 역할을 선택하고 게임을 시작하세요.
+            닉네임을 입력하고 게임을 시작하세요.
         </p>
 
-        <!-- 닉네임 선택 -->
+        <!-- 닉네임 입력 -->
         <div class="space-y-4">
             <div>
-                <label for="player-nickname-select" class="block text-sm font-medium text-gray-700 mb-1">내 닉네임</label>
-                <select id="player-nickname-select" 
+                <label for="player-nickname-input" class="block text-sm font-medium text-gray-700 mb-1">내 닉네임</label>
+                <input type="text" id="player-nickname-input" placeholder="예: 형쓰" maxlength="10"
                        class="w-full p-3 border border-gray-300 bg-white rounded-lg focus:ring-secondary focus:border-secondary transition duration-150">
-                    <option value="" disabled selected>닉네임을 선택하세요</option>
-                    <option value="형쓰">형쓰</option>
-                    <option value="홍쓰">홍쓰</option>
-                    <option value="알파카">알파카</option>
-                    <option value="홍딱지">홍딱지</option>
-                </select>
-            </div>
-             <!-- 역할 선택 (P1 / P2) -->
-            <div>
-                <label for="player-role-select" class="block text-sm font-medium text-gray-700 mb-1">내 역할 (Player 1/2)</label>
-                <select id="player-role-select" 
-                       class="w-full p-3 border border-gray-300 bg-white rounded-lg focus:ring-secondary focus:border-secondary transition duration-150">
-                    <option value="" disabled selected>역할을 선택하세요</option>
-                    <option value="P1">Player 1 (선공)</option>
-                    <option value="P2">Player 2 (후공)</option>
-                </select>
             </div>
         </div>
-
+        
         <!-- 상태 메시지 및 버튼 -->
-        <div id="status-message" class="text-center text-sm font-semibold text-blue-600">
-            <span id="auth-status">닉네임과 역할을 선택해 주세요.</span>
+        <div id="auth-status-box" class="text-center text-sm font-semibold p-3 rounded-lg bg-blue-50 border border-blue-200">
+            <span id="auth-status" class="text-blue-600">인증 중...</span>
+            <p id="user-id-display" class="text-xs text-gray-500 mt-1 hidden"></p>
         </div>
 
-        <button id="start-game-btn" disabled
-                class="w-full py-3 px-4 bg-secondary text-white font-bold rounded-lg shadow-md hover:bg-blue-700 transition duration-300 disabled:bg-gray-400">
-            로컬 게임 시작
-        </button>
+        <div id="lobby-actions" class="space-y-4">
+            <!-- 방 생성 -->
+            <button id="create-room-btn" disabled
+                    class="w-full py-3 px-4 bg-accent text-white font-bold rounded-lg shadow-md hover:bg-green-600 transition duration-300 disabled:bg-gray-400">
+                새 게임 방 생성 (Player 1)
+            </button>
+            
+            <!-- 방 참가 -->
+            <div class="flex space-x-2">
+                <input type="text" id="join-game-id-input" placeholder="참가할 게임 ID 입력" 
+                       class="flex-grow p-3 border border-gray-300 rounded-lg text-lg text-center disabled:bg-gray-100" disabled>
+                <button id="join-room-btn" disabled
+                        class="py-3 px-6 bg-secondary text-white font-bold rounded-lg shadow-md hover:bg-blue-700 transition duration-300 disabled:bg-gray-400">
+                    방 참가 (Player 2)
+                </button>
+            </div>
+        </div>
         
         <p class="text-xs text-center text-gray-400 pt-4">
-            로컬 테스트 모드: 데이터는 브라우저에만 저장됩니다.
+            실시간 모드: Firebase Firestore를 사용하여 데이터가 공유됩니다.
         </p>
     </div>
 
     <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, where, getDocs, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
-        const authStatusEl = document.getElementById('auth-status');
-        const startButton = document.getElementById('start-game-btn');
-        const nicknameSelect = document.getElementById('player-nickname-select');
-        const roleSelect = document.getElementById('player-role-select');
-
-        // 헬퍼 함수: 버튼 활성화/비활성화
-        function checkInputs() {
-            const nickname = nicknameSelect.value;
-            const role = roleSelect.value;
-            startButton.disabled = !(nickname && role);
-        }
-
-        // 1. 로컬 게임 시작 처리
-        function handleGameStart() {
-            const nickname = nicknameSelect.value;
-            const myRole = roleSelect.value;
-
-            if (!nickname || !myRole) {
-                authStatusEl.textContent = "오류: 닉네임과 역할을 모두 선택해 주세요.";
-                return;
+        // --- 캔버스 환경 변수 사용 및 안전한 파싱 ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        let firebaseConfig = {};
+        try {
+             // __firebase_config가 문자열이 아닌 경우를 대비해 JSON.parse를 안전하게 실행
+            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+                firebaseConfig = JSON.parse(__firebase_config);
             }
+        } catch (e) {
+            console.error("Failed to parse __firebase_config:", e);
+        }
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        let app, db, auth, userId;
 
-            // 로컬 스토리지에 데이터 저장
-            localStorage.setItem('playerNickname', nickname);
-            localStorage.setItem('myRole', myRole); // P1 또는 P2 역할 저장
-            localStorage.setItem('gameId', 'LOCAL_DUO_GAME'); // 고정된 로컬 게임 ID
+        const authStatusEl = document.getElementById('auth-status');
+        const userIdDisplayEl = document.getElementById('user-id-display');
+        const nicknameInput = document.getElementById('player-nickname-input');
+        const createRoomBtn = document.getElementById('create-room-btn');
+        const joinGameIdInput = document.getElementById('join-game-id-input');
+        const joinRoomBtn = document.getElementById('join-room-btn');
+        
+        // --- Firebase 초기화 및 인증 ---
+        async function initializeFirebase() {
+            try {
+                // Firebase Config 유효성 검사 강화
+                if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+                    authStatusEl.textContent = '❌ Firebase 설정 오류: API 키 또는 Project ID가 없습니다.';
+                    authStatusEl.classList.remove('text-blue-600', 'bg-blue-50', 'border-blue-200');
+                    authStatusEl.classList.add('text-error', 'bg-red-100', 'border-error');
+                    
+                    // 오류 발생 시 모든 버튼 비활성화
+                    createRoomBtn.disabled = true;
+                    joinRoomBtn.disabled = true;
+                    joinGameIdInput.disabled = true;
+                    return;
+                }
 
-            authStatusEl.textContent = `${nickname}님 (${myRole})으로 게임 시작!`;
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                
+                authStatusEl.textContent = '인증 중...';
+                
+                // 1. 초기 토큰을 사용하여 로그인 시도 (캔버스 환경)
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    // 2. 토큰이 없으면 익명 로그인 시도 (로컬 테스트 환경)
+                    await signInAnonymously(auth);
+                }
 
-            // 실제 게임 화면으로 이동
-            window.location.href = 'game.html'; 
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        authStatusEl.textContent = '✅ Firebase 인증 완료.';
+                        userIdDisplayEl.textContent = `User ID: ${userId}`;
+                        userIdDisplayEl.classList.remove('hidden');
+                        
+                        // 인증 완료 후 버튼 활성화 상태 체크
+                        checkInputs();
+                    } else {
+                        // 인증 실패 시 (다시 시도하거나 에러 표시)
+                        authStatusEl.textContent = '❌ 인증 실패. 새로고침 해주세요.';
+                        authStatusEl.classList.remove('text-blue-600', 'bg-blue-50', 'border-blue-200');
+                        authStatusEl.classList.add('text-error', 'bg-red-100', 'border-error');
+                    }
+                });
+
+            } catch (error) {
+                authStatusEl.textContent = `❌ Firebase 초기화 오류: ${error.message}`;
+                authStatusEl.classList.remove('text-blue-600', 'bg-blue-50', 'border-blue-200');
+                authStatusEl.classList.add('text-error', 'bg-red-100', 'border-error');
+                console.error("Firebase Initialization Error:", error);
+                
+                // 오류 발생 시 모든 버튼 비활성화
+                createRoomBtn.disabled = true;
+                joinRoomBtn.disabled = true;
+                joinGameIdInput.disabled = true;
+            }
+        }
+        
+        // --- UI 및 입력 유효성 검사 ---
+
+        function checkInputs() {
+            const nickname = nicknameInput.value.trim();
+            const joinGameId = joinGameIdInput.value.trim();
+            const isAuthenticated = !!userId;
+
+            // 닉네임 입력 상태에 따라 버튼 활성화/비활성화
+            const isNicknameValid = !!nickname;
+
+            // 인증이 완료되어야 모든 필드 및 버튼 활성화
+            createRoomBtn.disabled = !(isAuthenticated && isNicknameValid);
+            joinRoomBtn.disabled = !(isAuthenticated && isNicknameValid && joinGameId.length === 6); // 6자리 ID 가정
+            
+            joinGameIdInput.disabled = !isAuthenticated;
         }
 
-        // 이벤트 리스너 연결
-        nicknameSelect.addEventListener('change', checkInputs);
-        roleSelect.addEventListener('change', checkInputs);
-        startButton.addEventListener('click', handleGameStart);
+        nicknameInput.addEventListener('input', checkInputs);
+        joinGameIdInput.addEventListener('input', checkInputs);
 
-        // 초기 상태 확인
-        checkInputs();
+        // --- 게임 로직: 방 관리 ---
 
+        // 유틸리티: 6자리 랜덤 게임 ID 생성
+        function generateGameId() {
+            // 6자리 영대문자+숫자
+            return Math.random().toString(36).substring(2, 8).toUpperCase(); 
+        }
+
+        // 1. 방 생성 (Player 1)
+        createRoomBtn.addEventListener('click', async () => {
+            if (!userId) return;
+
+            const nickname = nicknameInput.value.trim();
+            if (!nickname) return alert('닉네임을 입력해 주세요.');
+
+            createRoomBtn.disabled = true;
+            createRoomBtn.textContent = '방 생성 중...';
+
+            const newGameId = generateGameId();
+            // 게임 데이터는 /artifacts/{appId}/public/data/games/{gameId} 에 저장합니다.
+            const gameRef = doc(db, `artifacts/${appId}/public/data/games`, newGameId);
+
+            const initialGameData = {
+                gameId: newGameId,
+                status: 'WAITING', // WAITING: P2 대기 중, SETUP: P2 참가 완료, IN_PROGRESS, FINISHED
+                player1_uid: userId,
+                player1_nickname: nickname,
+                player2_uid: null,
+                player2_nickname: null,
+                player1_secret: null,
+                player2_secret: null,
+                turn: null, 
+                logs: [],
+                createdAt: new Date().getTime(),
+                winner_nickname: null,
+            };
+
+            try {
+                await setDoc(gameRef, initialGameData);
+                
+                // 성공하면 게임 화면으로 이동
+                localStorage.setItem('gameId', newGameId);
+                localStorage.setItem('playerNickname', nickname);
+                localStorage.setItem('myRole', 'P1');
+                window.location.href = 'game.html';
+            } catch (error) {
+                alert(`방 생성 실패: ${error.message}`);
+                createRoomBtn.disabled = false;
+                createRoomBtn.textContent = '새 게임 방 생성 (Player 1)';
+            }
+        });
+
+        // 2. 방 참가 (Player 2)
+        joinRoomBtn.addEventListener('click', async () => {
+            if (!userId) return;
+
+            const nickname = nicknameInput.value.trim();
+            const gameIdToJoin = joinGameIdInput.value.trim().toUpperCase();
+
+            if (!nickname || gameIdToJoin.length !== 6) return alert('닉네임과 유효한 게임 ID를 입력해 주세요.');
+            
+            joinRoomBtn.disabled = true;
+            joinRoomBtn.textContent = '참가 확인 중...';
+
+            // 트랜잭션을 사용하여 동시성 문제 방지
+            const gameRef = doc(db, `artifacts/${appId}/public/data/games`, gameIdToJoin);
+
+            try {
+                await runTransaction(db, async (transaction) => {
+                    const gameDoc = await transaction.get(gameRef);
+
+                    if (!gameDoc.exists()) {
+                        throw new Error("존재하지 않는 게임 ID입니다.");
+                    }
+
+                    const data = gameDoc.data();
+
+                    if (data.status !== 'WAITING') {
+                        throw new Error("이미 시작되었거나 가득 찬 게임입니다.");
+                    }
+                    
+                    if (data.player1_uid === userId) {
+                        throw new Error("이미 Player 1으로 참가한 방입니다.");
+                    }
+
+                    // P2로 참가 확정
+                    transaction.update(gameRef, {
+                        status: 'SETUP', // P1, P2 모두 참가 완료 -> 비밀 숫자 설정 단계
+                        player2_uid: userId,
+                        player2_nickname: nickname,
+                    });
+                });
+
+                // 트랜잭션 성공 후 게임 화면으로 이동
+                localStorage.setItem('gameId', gameIdToJoin);
+                localStorage.setItem('playerNickname', nickname);
+                localStorage.setItem('myRole', 'P2');
+                window.location.href = 'game.html';
+
+            } catch (error) {
+                alert(`방 참가 실패: ${error.message}`);
+                joinRoomBtn.disabled = false;
+                joinRoomBtn.textContent = '방 참가 (Player 2)';
+            }
+        });
+
+
+        // --- 초기화 ---
+        initializeFirebase();
     </script>
 </body>
 </html>
