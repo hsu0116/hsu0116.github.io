@@ -75,14 +75,14 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, where, getDocs, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
         // --- 캔버스 환경 변수 사용 및 안전한 파싱 ---
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        let firebaseConfig = {};
+        let firebaseConfig = null;
         try {
-             // __firebase_config가 문자열이 아닌 경우를 대비해 JSON.parse를 안전하게 실행
-            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+             // __firebase_config 변수가 문자열이며 비어있지 않은지 확인 후 JSON.parse 실행
+            if (typeof __firebase_config !== 'undefined' && __firebase_config && typeof __firebase_config === 'string') {
                 firebaseConfig = JSON.parse(__firebase_config);
             }
         } catch (e) {
@@ -99,19 +99,23 @@
         const joinGameIdInput = document.getElementById('join-game-id-input');
         const joinRoomBtn = document.getElementById('join-room-btn');
         
+        // 버튼 및 입력 필드 비활성화 함수
+        function disableLobbyActions() {
+            createRoomBtn.disabled = true;
+            joinRoomBtn.disabled = true;
+            joinGameIdInput.disabled = true;
+        }
+
         // --- Firebase 초기화 및 인증 ---
         async function initializeFirebase() {
+            disableLobbyActions(); // 초기에는 모두 비활성화
+
             try {
                 // Firebase Config 유효성 검사 강화
-                if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+                if (!firebaseConfig || !firebaseConfig.apiKey || !firebaseConfig.projectId) {
                     authStatusEl.textContent = '❌ Firebase 설정 오류: API 키 또는 Project ID가 없습니다.';
                     authStatusEl.classList.remove('text-blue-600', 'bg-blue-50', 'border-blue-200');
                     authStatusEl.classList.add('text-error', 'bg-red-100', 'border-error');
-                    
-                    // 오류 발생 시 모든 버튼 비활성화
-                    createRoomBtn.disabled = true;
-                    joinRoomBtn.disabled = true;
-                    joinGameIdInput.disabled = true;
                     return;
                 }
 
@@ -133,6 +137,8 @@
                     if (user) {
                         userId = user.uid;
                         authStatusEl.textContent = '✅ Firebase 인증 완료.';
+                        authStatusEl.classList.remove('bg-red-100', 'border-error');
+                        authStatusEl.classList.add('bg-blue-50', 'border-blue-200');
                         userIdDisplayEl.textContent = `User ID: ${userId}`;
                         userIdDisplayEl.classList.remove('hidden');
                         
@@ -143,6 +149,7 @@
                         authStatusEl.textContent = '❌ 인증 실패. 새로고침 해주세요.';
                         authStatusEl.classList.remove('text-blue-600', 'bg-blue-50', 'border-blue-200');
                         authStatusEl.classList.add('text-error', 'bg-red-100', 'border-error');
+                        disableLobbyActions();
                     }
                 });
 
@@ -151,11 +158,7 @@
                 authStatusEl.classList.remove('text-blue-600', 'bg-blue-50', 'border-blue-200');
                 authStatusEl.classList.add('text-error', 'bg-red-100', 'border-error');
                 console.error("Firebase Initialization Error:", error);
-                
-                // 오류 발생 시 모든 버튼 비활성화
-                createRoomBtn.disabled = true;
-                joinRoomBtn.disabled = true;
-                joinGameIdInput.disabled = true;
+                disableLobbyActions();
             }
         }
         
@@ -189,10 +192,10 @@
 
         // 1. 방 생성 (Player 1)
         createRoomBtn.addEventListener('click', async () => {
-            if (!userId) return;
+            if (!userId || createRoomBtn.disabled) return; // 이중 체크
 
             const nickname = nicknameInput.value.trim();
-            if (!nickname) return alert('닉네임을 입력해 주세요.');
+            if (!nickname) return console.error('닉네임을 입력해 주세요.');
 
             createRoomBtn.disabled = true;
             createRoomBtn.textContent = '방 생성 중...';
@@ -225,7 +228,12 @@
                 localStorage.setItem('myRole', 'P1');
                 window.location.href = 'game.html';
             } catch (error) {
-                alert(`방 생성 실패: ${error.message}`);
+                // 사용자에게 alert 대신 UI에 에러 표시
+                console.error(`방 생성 실패: ${error.message}`);
+                authStatusEl.textContent = `❌ 방 생성 실패: ${error.message}`;
+                authStatusEl.classList.remove('text-blue-600', 'bg-blue-50', 'border-blue-200');
+                authStatusEl.classList.add('text-error', 'bg-red-100', 'border-error');
+                
                 createRoomBtn.disabled = false;
                 createRoomBtn.textContent = '새 게임 방 생성 (Player 1)';
             }
@@ -233,12 +241,12 @@
 
         // 2. 방 참가 (Player 2)
         joinRoomBtn.addEventListener('click', async () => {
-            if (!userId) return;
+            if (!userId || joinRoomBtn.disabled) return; // 이중 체크
 
             const nickname = nicknameInput.value.trim();
             const gameIdToJoin = joinGameIdInput.value.trim().toUpperCase();
 
-            if (!nickname || gameIdToJoin.length !== 6) return alert('닉네임과 유효한 게임 ID를 입력해 주세요.');
+            if (!nickname || gameIdToJoin.length !== 6) return console.error('닉네임과 유효한 게임 ID를 입력해 주세요.');
             
             joinRoomBtn.disabled = true;
             joinRoomBtn.textContent = '참가 확인 중...';
@@ -279,7 +287,12 @@
                 window.location.href = 'game.html';
 
             } catch (error) {
-                alert(`방 참가 실패: ${error.message}`);
+                // 사용자에게 alert 대신 UI에 에러 표시
+                console.error(`방 참가 실패: ${error.message}`);
+                authStatusEl.textContent = `❌ 방 참가 실패: ${error.message}`;
+                authStatusEl.classList.remove('text-blue-600', 'bg-blue-50', 'border-blue-200');
+                authStatusEl.classList.add('text-error', 'bg-red-100', 'border-error');
+                
                 joinRoomBtn.disabled = false;
                 joinRoomBtn.textContent = '방 참가 (Player 2)';
             }
