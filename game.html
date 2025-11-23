@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>⚾️ 2인 숫자 야구 - 게임 중 (로컬 모드)</title>
+    <title>⚾️ 2인 숫자 야구 - 실시간 로비</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -17,471 +17,253 @@
                         'primary': '#2c3e50',
                         'secondary': '#3498db',
                         'accent': '#2ecc71',
-                        'error': '#e74c3c',
-                        'strike': '#2c3e50',
-                        'ball': '#f39c12'
+                        'error': '#e74c3c'
                     }
                 }
             }
         }
     </script>
 </head>
-<body class="bg-gray-100 min-h-screen p-4 font-sans">
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4 font-sans">
 
-    <div id="game-container" class="max-w-3xl mx-auto bg-white p-6 md:p-10 rounded-xl shadow-2xl space-y-6">
+    <div id="app-container" class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md space-y-6">
         <h1 class="text-3xl font-bold text-center text-primary">
-            ⚾️ 2인 숫자 야구 (로컬 모드)
+            ⚾️ 2인 숫자 야구 (실시간)
         </h1>
-        <div class="text-center text-sm text-gray-500 border-b pb-4">
-            <span id="player-info" class="font-medium text-secondary"></span> 님 | 
-            <span id="role-info" class="font-bold"></span> | 
-            게임 ID: <span id="game-id-display" class="font-mono text-xs text-gray-600"></span>
-        </div>
+        <p class="text-center text-gray-500 mb-6">
+            닉네임을 입력하고 게임을 시작하세요.
+        </p>
 
-        <!-- 게임 상태 및 정보 -->
-        <div id="game-status-box" class="p-4 rounded-lg bg-blue-50 border border-blue-200 text-center">
-            <p id="match-status" class="font-bold text-blue-800">게임을 로드하는 중...</p>
+        <!-- 닉네임 입력 -->
+        <div class="space-y-4">
+            <div>
+                <label for="player-nickname-input" class="block text-sm font-medium text-gray-700 mb-1">내 닉네임</label>
+                <input type="text" id="player-nickname-input" placeholder="예: 형쓰" maxlength="10"
+                       class="w-full p-3 border border-gray-300 bg-white rounded-lg focus:ring-secondary focus:border-secondary transition duration-150">
+            </div>
         </div>
         
-        <!-- 비밀 숫자 설정 영역 -->
-        <div id="secret-setup-area" class="space-y-4">
-            <h2 class="text-xl font-semibold text-primary">나의 비밀 숫자 설정 (4자리, 중복 없이)</h2>
+        <!-- 상태 메시지 및 버튼 -->
+        <div id="auth-status-box" class="text-center text-sm font-semibold p-3 rounded-lg bg-blue-50 border border-blue-200">
+            <span id="auth-status" class="text-blue-600">인증 중...</span>
+            <p id="user-id-display" class="text-xs text-gray-500 mt-1 hidden"></p>
+        </div>
+
+        <div id="lobby-actions" class="space-y-4">
+            <!-- 방 생성 -->
+            <button id="create-room-btn" disabled
+                    class="w-full py-3 px-4 bg-accent text-white font-bold rounded-lg shadow-md hover:bg-green-600 transition duration-300 disabled:bg-gray-400">
+                새 게임 방 생성 (Player 1)
+            </button>
+            
+            <!-- 방 참가 -->
             <div class="flex space-x-2">
-                <input type="text" id="secret-number-input" maxlength="4" placeholder="예: 1478"
-                       class="flex-grow p-3 border border-gray-300 rounded-lg text-lg text-center">
-                <button id="set-secret-btn" class="bg-accent text-white py-3 px-6 rounded-lg font-bold hover:bg-green-600 transition">
-                    숫자 확정
+                <input type="text" id="join-game-id-input" placeholder="참가할 게임 ID 입력" 
+                       class="flex-grow p-3 border border-gray-300 rounded-lg text-lg text-center disabled:bg-gray-100" disabled>
+                <button id="join-room-btn" disabled
+                        class="py-3 px-6 bg-secondary text-white font-bold rounded-lg shadow-md hover:bg-blue-700 transition duration-300 disabled:bg-gray-400">
+                    방 참가 (Player 2)
                 </button>
             </div>
-            <p id="secret-error" class="text-error text-sm hidden">4자리, 중복 없는 숫자를 입력해 주세요.</p>
         </div>
-
-        <!-- 상대방 비밀 숫자 설정 영역 안내 / 로컬 테스트 헬퍼 (수정됨) -->
-        <div id="opponent-secret-setup-area" class="space-y-4 hidden border-t pt-4 p-4 bg-yellow-50 rounded-lg shadow-inner">
-            <h2 id="opponent-setup-title" class="text-xl font-semibold text-primary">로컬 테스트: 상대방 숫자 설정 헬퍼</h2>
-            <p id="opponent-secret-status" class="text-gray-600 text-sm">
-                로컬 모드에서는 상대방 역할을 대신하여 숫자를 설정해야 게임이 시작됩니다. 
-                아래에 상대방의 비밀 숫자를 입력하여 설정을 완료하세요.
-            </p>
-            <div id="opponent-setup-input-group" class="flex space-x-2">
-                <input type="text" id="opponent-secret-input" maxlength="4" placeholder="상대방 비밀 숫자 (예: 9876)"
-                       class="flex-grow p-3 border border-gray-300 rounded-lg text-lg text-center">
-                <button id="set-opponent-secret-btn" disabled 
-                        class="bg-blue-500 text-white py-3 px-6 rounded-lg font-bold hover:bg-blue-600 transition disabled:bg-gray-400">
-                    상대방 숫자 확정
-                </button>
-            </div>
-            <p id="opponent-secret-error" class="text-error text-sm hidden"></p>
-        </div>
-
-        <!-- 게임 로그 영역 -->
-        <div id="game-log-area" class="space-y-3 pt-6 border-t mt-6">
-            <h2 class="text-xl font-semibold text-primary">게임 로그</h2>
-            <div id="logs" class="bg-gray-50 h-64 overflow-y-auto p-4 rounded-lg border border-gray-200 text-sm space-y-2">
-                <!-- 게임 기록이 여기에 표시됩니다 -->
-            </div>
-        </div>
-
-        <!-- 추측 입력 영역 (게임 시작 후 활성화) -->
-        <div id="guess-input-area" class="space-y-4 pt-4 border-t" style="display: none;">
-            <h2 class="text-xl font-semibold text-primary">상대방 숫자 추측하기</h2>
-            <div class="flex space-x-2">
-                <input type="text" id="guess-input" maxlength="4" placeholder="4자리 숫자 입력" disabled
-                       class="flex-grow p-3 border border-gray-300 rounded-lg text-lg text-center bg-white disabled:bg-gray-200">
-                <button id="submit-guess-btn" disabled
-                        class="bg-secondary text-white py-3 px-6 rounded-lg font-bold hover:bg-blue-700 transition disabled:bg-gray-400">
-                    추측 시도
-                </button>
-            </div>
-            <p id="guess-error" class="text-error text-sm hidden">추측 숫자가 유효하지 않거나 지금은 상대방 차례입니다.</p>
-        </div>
-         <button id="back-to-lobby-btn" 
-                class="w-full py-2 px-4 bg-gray-300 text-gray-800 font-bold rounded-lg hover:bg-gray-400 transition duration-300 mt-4">
-            로비로 돌아가기
-        </button>
+        
+        <p class="text-xs text-center text-gray-400 pt-4">
+            실시간 모드: Firebase Firestore를 사용하여 데이터가 공유됩니다.
+        </p>
     </div>
 
-    <!-- 로컬 게임 스크립트 -->
     <script type="module">
-        // 로컬 스토리지 키 정의
-        const LOCAL_STORAGE_KEY = 'LOCAL_DUO_GAME_DATA';
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection, query, where, getDocs, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
-        let gameData = {};
-        const gameId = localStorage.getItem('gameId');
-        const playerNickname = localStorage.getItem('playerNickname');
-        let myRole = localStorage.getItem('myRole'); // 'P1' 또는 'P2'
-
-        const DIGIT_COUNT = 4;
-
-        const gameIdDisplay = document.getElementById('game-id-display');
-        const playerInfoEl = document.getElementById('player-info');
-        const roleInfoEl = document.getElementById('role-info');
-        const matchStatusEl = document.getElementById('match-status');
-        const secretInput = document.getElementById('secret-number-input');
-        const setSecretBtn = document.getElementById('set-secret-btn');
-        const secretSetupArea = document.getElementById('secret-setup-area');
-        const secretErrorEl = document.getElementById('secret-error');
-        const logsEl = document.getElementById('logs');
-        const guessInput = document.getElementById('guess-input');
-        const submitGuessBtn = document.getElementById('submit-guess-btn');
-        const guessErrorEl = document.getElementById('guess-error');
-        const backToLobbyBtn = document.getElementById('back-to-lobby-btn');
-
-        // 로컬 테스트 헬퍼 관련 요소
-        const opponentSecretSetupArea = document.getElementById('opponent-secret-setup-area');
-        const opponentSetupTitle = document.getElementById('opponent-setup-title');
-        const opponentSecretStatusEl = document.getElementById('opponent-secret-status');
-        const opponentSetupInputGroup = document.getElementById('opponent-setup-input-group');
-        const opponentSecretInput = document.getElementById('opponent-secret-input');
-        const setOpponentSecretBtn = document.getElementById('set-opponent-secret-btn');
-        const opponentSecretErrorEl = document.getElementById('opponent-secret-error');
-
-
-        if (gameId !== 'LOCAL_DUO_GAME' || !playerNickname || !myRole) {
-            console.error("로컬 게임 정보가 없습니다. 로비로 돌아갑니다.");
-            window.location.href = 'index.html';
-            return;
-        }
-
-        gameIdDisplay.textContent = gameId;
-        playerInfoEl.textContent = playerNickname;
-        roleInfoEl.textContent = (myRole === 'P1' ? 'Player 1 (선공)' : 'Player 2 (후공)');
+        // --- 캔버스 환경 변수 사용 ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
         
-        // --- 로컬 데이터 관리 함수 ---
+        let app, db, auth, userId;
 
-        // 로컬 스토리지에서 게임 데이터 로드
-        function loadGameData() {
-            const data = localStorage.getItem(LOCAL_STORAGE_KEY);
-            if (data) {
-                gameData = JSON.parse(data);
-                // 접속한 사용자의 닉네임이 P1, P2 중 어느 한쪽에라도 저장되도록 갱신 (선택한 역할 기준)
-                if (myRole === 'P1') {
-                    gameData.player1_nickname = playerNickname;
+        const authStatusEl = document.getElementById('auth-status');
+        const userIdDisplayEl = document.getElementById('user-id-display');
+        const nicknameInput = document.getElementById('player-nickname-input');
+        const createRoomBtn = document.getElementById('create-room-btn');
+        const joinGameIdInput = document.getElementById('join-game-id-input');
+        const joinRoomBtn = document.getElementById('join-room-btn');
+        
+        // --- Firebase 초기화 및 인증 ---
+        async function initializeFirebase() {
+            try {
+                if (!firebaseConfig.apiKey) {
+                    authStatusEl.textContent = '❌ Firebase 설정 오류: API 키가 없습니다.';
+                    authStatusEl.classList.remove('text-blue-600');
+                    authStatusEl.classList.add('text-error', 'bg-red-100');
+                    return;
+                }
+
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                
+                authStatusEl.textContent = '인증 중...';
+                
+                // 1. 초기 토큰을 사용하여 로그인 시도 (캔버스 환경)
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
                 } else {
-                    gameData.player2_nickname = playerNickname;
+                    // 2. 토큰이 없으면 익명 로그인 시도 (로컬 테스트 환경)
+                    await signInAnonymously(auth);
                 }
-            } else {
-                // 초기 게임 데이터 설정 
-                gameData = {
-                    status: "SETUP", // SETUP 단계부터 시작
-                    player1_secret: null,
-                    player2_secret: null,
-                    turn: null,
-                    logs: [],
-                    player1_nickname: myRole === 'P1' ? playerNickname : 'Player 1 대기 중', 
-                    player2_nickname: myRole === 'P2' ? playerNickname : 'Player 2 대기 중',
-                    winner_nickname: null,
-                };
-            }
-            updateGameUI();
-        }
 
-        // 로컬 스토리지에 게임 데이터 저장
-        function saveGameData() {
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(gameData));
-        }
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        authStatusEl.textContent = '✅ Firebase 인증 완료.';
+                        userIdDisplayEl.textContent = `User ID: ${userId}`;
+                        userIdDisplayEl.classList.remove('hidden');
+                        
+                        // 인증 완료 후 버튼 활성화 상태 체크
+                        checkInputs();
+                    } else {
+                        // 인증 실패 시 (다시 시도하거나 에러 표시)
+                        authStatusEl.textContent = '❌ 인증 실패. 새로고침 해주세요.';
+                        authStatusEl.classList.remove('text-blue-600');
+                        authStatusEl.classList.add('text-error', 'bg-red-100');
+                    }
+                });
 
-        // --- 게임 로직 헬퍼 함수 ---
-
-        // 4자리, 중복 없는 숫자인지 확인
-        function isValidSecret(num) {
-            if (!new RegExp(`^\\d{${DIGIT_COUNT}}$`).test(num)) return false; 
-            const digits = num.split('');
-            return new Set(digits).size === DIGIT_COUNT; 
-        }
-
-        // 스트라이크, 볼, 아웃 판정 로직
-        function calculateResult(guess, target) {
-            let strikes = 0;
-            let balls = 0;
-
-            if (!guess || !target || guess.length !== target.length) {
-                return "Error"; 
-            }
-
-            for (let i = 0; i < DIGIT_COUNT; i++) {
-                if (guess[i] === target[i]) {
-                    strikes++;
-                } else if (target.includes(guess[i])) {
-                    balls++;
-                }
-            }
-
-            if (strikes === 0 && balls === 0) {
-                return "0S 0B (OUT)";
-            } else if (strikes === DIGIT_COUNT) {
-                return `${DIGIT_COUNT}S (HOMERUN!)`;
-            } else {
-                let result = '';
-                if (strikes > 0) result += `${strikes}S`;
-                if (balls > 0) {
-                    if (result) result += ' ';
-                    result += `${balls}B`;
-                }
-                return result.trim();
+            } catch (error) {
+                authStatusEl.textContent = `❌ Firebase 초기화 오류: ${error.message}`;
+                authStatusEl.classList.remove('text-blue-600');
+                authStatusEl.classList.add('text-error', 'bg-red-100');
+                console.error("Firebase Initialization Error:", error);
             }
         }
-
-        // --- 이벤트 핸들러 ---
         
-        // 1. 비밀 숫자 확정 핸들러 (로컬 업데이트)
-        setSecretBtn.addEventListener('click', () => {
-            const secret = secretInput.value.trim();
-            if (!isValidSecret(secret)) {
-                secretErrorEl.textContent = `${DIGIT_COUNT}자리, 중복 없는 숫자를 입력해 주세요.`;
-                secretErrorEl.classList.remove('hidden');
-                return;
-            }
-            secretErrorEl.classList.add('hidden');
+        // --- UI 및 입력 유효성 검사 ---
 
-            // 내 역할에 따라 비밀 숫자 저장
-            if (myRole === 'P1') {
-                gameData.player1_secret = secret;
-            } else { // P2
-                gameData.player2_secret = secret;
-            }
+        function checkInputs() {
+            const nickname = nicknameInput.value.trim();
+            const joinGameId = joinGameIdInput.value.trim();
+            const isAuthenticated = !!userId;
 
-            // 두 플레이어 모두 비밀 숫자를 설정했는지 확인 -> 이 단계에서는 아직 체크하지 않고, 상대방 헬퍼에서 처리
+            createRoomBtn.disabled = !(isAuthenticated && nickname);
+            joinRoomBtn.disabled = !(isAuthenticated && nickname && joinGameId.length === 6); // 6자리 ID 가정
             
-            saveGameData();
-            updateGameUI();
+            joinGameIdInput.disabled = !isAuthenticated;
+        }
+
+        nicknameInput.addEventListener('input', checkInputs);
+        joinGameIdInput.addEventListener('input', checkInputs);
+
+        // --- 게임 로직: 방 관리 ---
+
+        // 유틸리티: 6자리 랜덤 게임 ID 생성
+        function generateGameId() {
+            return Math.random().toString(36).substring(2, 8).toUpperCase(); // 6자리 영대문자+숫자
+        }
+
+        // 1. 방 생성 (Player 1)
+        createRoomBtn.addEventListener('click', async () => {
+            if (!userId) return;
+
+            const nickname = nicknameInput.value.trim();
+            if (!nickname) return alert('닉네임을 입력해 주세요.');
+
+            createRoomBtn.disabled = true;
+            createRoomBtn.textContent = '방 생성 중...';
+
+            const newGameId = generateGameId();
+            // 게임 데이터는 /artifacts/{appId}/public/data/games/{gameId} 에 저장합니다.
+            const gameRef = doc(db, `artifacts/${appId}/public/data/games`, newGameId);
+
+            const initialGameData = {
+                gameId: newGameId,
+                status: 'WAITING', // WAITING: P2 대기 중, SETUP: P2 참가 완료, IN_PROGRESS, FINISHED
+                player1_uid: userId,
+                player1_nickname: nickname,
+                player2_uid: null,
+                player2_nickname: null,
+                player1_secret: null,
+                player2_secret: null,
+                turn: null, 
+                logs: [],
+                createdAt: new Date().getTime(),
+                winner_nickname: null,
+            };
+
+            try {
+                await setDoc(gameRef, initialGameData);
+                
+                // 성공하면 게임 화면으로 이동
+                localStorage.setItem('gameId', newGameId);
+                localStorage.setItem('playerNickname', nickname);
+                localStorage.setItem('myRole', 'P1');
+                window.location.href = 'game.html';
+            } catch (error) {
+                alert(`방 생성 실패: ${error.message}`);
+                createRoomBtn.disabled = false;
+                createRoomBtn.textContent = '새 게임 방 생성 (Player 1)';
+            }
         });
 
-        // 2. 상대방 비밀 숫자 설정 헬퍼 핸들러 (로컬 업데이트)
-        function handleSetOpponentSecret() {
-            const secret = opponentSecretInput.value.trim();
-            if (!isValidSecret(secret)) {
-                opponentSecretErrorEl.textContent = `${DIGIT_COUNT}자리, 중복 없는 숫자를 입력해 주세요.`;
-                opponentSecretErrorEl.classList.remove('hidden');
-                return;
-            }
+        // 2. 방 참가 (Player 2)
+        joinRoomBtn.addEventListener('click', async () => {
+            if (!userId) return;
 
-            // 내 비밀 숫자와 중복되는지 확인 (불가능하도록)
-            const mySecret = myRole === 'P1' ? gameData.player1_secret : gameData.player2_secret;
-            if (mySecret === secret) {
-                 opponentSecretErrorEl.textContent = `나의 비밀 숫자와 동일한 숫자를 설정할 수 없습니다.`;
-                 opponentSecretErrorEl.classList.remove('hidden');
-                 return;
-            }
+            const nickname = nicknameInput.value.trim();
+            const gameIdToJoin = joinGameIdInput.value.trim().toUpperCase();
 
-            opponentSecretErrorEl.classList.add('hidden');
-
-            // 상대방 역할에 따라 비밀 숫자 저장
-            if (myRole === 'P1') {
-                gameData.player2_secret = secret; // 내가 P1이면 P2의 숫자를 설정
-            } else { // P2
-                gameData.player1_secret = secret; // 내가 P2이면 P1의 숫자를 설정
-            }
-
-            // 두 플레이어 모두 비밀 숫자를 설정했으므로 게임 시작
-            gameData.status = 'IN_PROGRESS';
-            gameData.turn = 'P1'; // P1 선공
+            if (!nickname || gameIdToJoin.length !== 6) return alert('닉네임과 유효한 게임 ID를 입력해 주세요.');
             
-            saveGameData();
-            updateGameUI();
-        }
+            joinRoomBtn.disabled = true;
+            joinRoomBtn.textContent = '참가 확인 중...';
 
-        // 3. 추측 제출 핸들러 (로컬 업데이트)
-        function handleSubmitGuess() {
-            const guess = guessInput.value.trim();
-            if (!isValidSecret(guess)) {
-                guessErrorEl.textContent = `${DIGIT_COUNT}자리, 중복 없는 숫자를 입력해 주세요.`;
-                guessErrorEl.classList.remove('hidden');
-                return;
-            }
-            guessErrorEl.classList.add('hidden');
-            
-            // 1. 상대방의 비밀 숫자 가져오기
-            const targetSecretKey = myRole === 'P1' ? 'player2_secret' : 'player1_secret';
-            const targetSecret = gameData[targetSecretKey];
-            
-            if (!targetSecret) {
-                guessErrorEl.textContent = "오류: 상대방의 비밀 숫자가 설정되지 않았습니다.";
-                guessErrorEl.classList.remove('hidden');
-                return;
-            }
+            // 트랜잭션을 사용하여 동시성 문제 방지 (두 플레이어가 동시에 P2로 참가하는 경우 등)
+            const gameRef = doc(db, `artifacts/${appId}/public/data/games`, gameIdToJoin);
 
-            // 2. 결과 판정
-            const result = calculateResult(guess, targetSecret);
+            try {
+                await runTransaction(db, async (transaction) => {
+                    const gameDoc = await transaction.get(gameRef);
 
-            // 3. 로그 기록
-            const newLog = {
-                guesser: playerNickname,
-                guess: guess,
-                result: result,
-                timestamp: new Date().getTime(),
-                role: myRole
-            };
-            gameData.logs.push(newLog);
-
-            // 4. 다음 턴 및 상태 결정
-            const isWin = result.includes(`${DIGIT_COUNT}S`);
-            const nextTurn = myRole === 'P1' ? 'P2' : 'P1';
-            
-            if (isWin) {
-                gameData.status = 'FINISHED';
-                gameData.winner_nickname = playerNickname;
-                gameData.turn = null;
-            } else {
-                gameData.turn = nextTurn;
-            }
-            
-            saveGameData();
-            updateGameUI();
-            guessInput.value = ''; // 입력 필드 초기화
-        }
-
-        // 4. UI 업데이트 로직 (핵심)
-        function updateGameUI() {
-            let mySecretSet = (myRole === 'P1' ? gameData.player1_secret : gameData.player2_secret) !== null;
-            let opponentSecretSet = (myRole === 'P1' ? gameData.player2_secret : gameData.player1_secret) !== null;
-            const opponentRole = myRole === 'P1' ? 'Player 2' : 'Player 1';
-            const opponentNickname = myRole === 'P1' ? gameData.player2_nickname : gameData.player1_nickname;
-            
-            // 1. 매치 상태 표시
-            if (gameData.status === 'SETUP') {
-                if (!mySecretSet) {
-                    matchStatusEl.className = 'font-bold text-yellow-800';
-                    matchStatusEl.textContent = `당신의 비밀 숫자를 설정해 주세요.`;
-                } else if (!opponentSecretSet) {
-                    matchStatusEl.className = 'font-bold text-gray-800';
-                    matchStatusEl.textContent = `상대방 (${opponentNickname})의 숫자가 설정되기를 기다리는 중...`;
-                }
-            } else if (gameData.status === 'IN_PROGRESS') {
-                matchStatusEl.className = 'font-bold text-accent';
-                if (gameData.turn === myRole) {
-                    matchStatusEl.textContent = `내 차례입니다! ${opponentNickname}의 숫자를 추측하세요.`;
-                } else {
-                    matchStatusEl.textContent = `${opponentNickname}님의 차례입니다. 추측을 기다리는 중... (로컬 모드이므로, ${opponentRole}로 접속하여 진행하세요)`;
-                }
-            } else if (gameData.status === 'FINISHED') {
-                matchStatusEl.className = 'font-bold text-error';
-                matchStatusEl.textContent = `게임 종료! 승리자: ${gameData.winner_nickname}`;
-            }
-
-            // 2. 비밀 숫자 설정 영역 활성화/비활성화
-            if (gameData.status === 'SETUP' && !mySecretSet) {
-                secretSetupArea.style.display = 'block';
-                secretInput.disabled = false;
-                setSecretBtn.disabled = !isValidSecret(secretInput.value.trim()); 
-            } else {
-                secretSetupArea.style.display = 'none';
-            }
-            
-            // 3. 추측 입력 영역 활성화/비활성화
-            const guessArea = document.getElementById('guess-input-area');
-            
-            if (gameData.status === 'IN_PROGRESS') {
-                guessArea.style.display = 'block';
-                const myTurn = gameData.turn === myRole;
-                
-                guessInput.disabled = !myTurn || gameData.status === 'FINISHED';
-                submitGuessBtn.disabled = !myTurn || gameData.status === 'FINISHED' || !isValidSecret(guessInput.value.trim()); 
-                
-                if (myTurn) {
-                    guessInput.placeholder = "4자리 숫자를 입력하세요";
-                } else {
-                    guessInput.placeholder = `${opponentNickname} 차례를 기다리는 중...`;
-                }
-            } else {
-                guessArea.style.display = 'none';
-            }
-
-
-            // 4. 게임 로그 표시
-            logsEl.innerHTML = '';
-            if (gameData.logs && gameData.logs.length > 0) {
-                // 로그를 타임스탬프 기준으로 역순 정렬하여 최신 로그를 위에 표시
-                const sortedLogs = [...gameData.logs].sort((a, b) => b.timestamp - a.timestamp);
-                
-                sortedLogs.forEach(log => {
-                    const p = document.createElement('p');
-                    p.className = 'border-b pb-1 text-gray-800';
-                    
-                    let resultColorClass = 'font-bold';
-                    if (log.result.includes('HOMERUN')) {
-                        resultColorClass = 'text-accent font-extrabold';
-                    } else if (log.result.includes('S')) {
-                        resultColorClass = 'text-strike font-bold';
-                    } else if (log.result.includes('B')) {
-                        resultColorClass = 'text-ball font-bold';
+                    if (!gameDoc.exists()) {
+                        throw new Error("존재하지 않는 게임 ID입니다.");
                     }
 
-                    p.innerHTML = `<span class="font-semibold">${log.guesser}</span> 시도: ${log.guess} &rarr; <strong class="${resultColorClass}">${log.result}</strong>`;
-                    logsEl.prepend(p); 
+                    const data = gameDoc.data();
+
+                    if (data.status !== 'WAITING') {
+                        throw new Error("이미 시작되었거나 가득 찬 게임입니다.");
+                    }
+                    
+                    if (data.player1_uid === userId) {
+                        throw new Error("이미 Player 1으로 참가한 방입니다.");
+                    }
+
+                    // P2로 참가 확정
+                    transaction.update(gameRef, {
+                        status: 'SETUP', // P1, P2 모두 참가 완료 -> 비밀 숫자 설정 단계
+                        player2_uid: userId,
+                        player2_nickname: nickname,
+                    });
                 });
-            } else {
-                logsEl.innerHTML = `<p class="text-gray-600">게임을 시작하려면 비밀 숫자를 설정해야 합니다.</p>`;
+
+                // 트랜잭션 성공 후 게임 화면으로 이동
+                localStorage.setItem('gameId', gameIdToJoin);
+                localStorage.setItem('playerNickname', nickname);
+                localStorage.setItem('myRole', 'P2');
+                window.location.href = 'game.html';
+
+            } catch (error) {
+                alert(`방 참가 실패: ${error.message}`);
+                joinRoomBtn.disabled = false;
+                joinRoomBtn.textContent = '방 참가 (Player 2)';
             }
-
-            // 5. 상대방 설정/차례 안내 영역 관리
-            
-            // 5-1. SETUP 단계: 내 숫자는 설정했고, 상대방 숫자가 없을 때 -> 헬퍼 표시
-            if (gameData.status === 'SETUP' && mySecretSet && !opponentSecretSet) {
-                opponentSecretSetupArea.classList.remove('hidden');
-                opponentSecretSetupArea.classList.add('bg-yellow-50');
-                opponentSetupTitle.textContent = '로컬 테스트: 상대방 숫자 설정 헬퍼';
-                opponentSecretStatusEl.textContent = `로컬 모드에서는 상대방 역할(${opponentRole})을 대신하여 숫자를 설정해야 게임이 시작됩니다.`;
-                opponentSetupInputGroup.style.display = 'flex';
-                opponentSecretInput.disabled = false;
-                setOpponentSecretBtn.disabled = !isValidSecret(opponentSecretInput.value.trim());
-                opponentSecretErrorEl.style.display = 'block';
-
-            } 
-            // 5-2. IN_PROGRESS 단계: 상대방 차례일 때 -> 대기 안내 표시
-            else if (gameData.status === 'IN_PROGRESS' && gameData.turn !== myRole) {
-                opponentSecretSetupArea.classList.remove('hidden');
-                opponentSecretSetupArea.classList.remove('bg-yellow-50');
-                opponentSetupTitle.textContent = '상대방 차례 안내';
-                opponentSecretStatusEl.textContent = `현재는 ${opponentNickname} (${opponentRole})의 차례입니다. 게임을 계속하려면 로비로 돌아가 ${opponentRole}로 접속하여 추측을 진행하세요.`;
-                opponentSetupInputGroup.style.display = 'none'; // 헬퍼 입력 숨김
-                opponentSecretErrorEl.style.display = 'none'; // 에러 숨김
-            } 
-            // 5-3. 그 외 (내 숫자도 설정 안 됐거나, 게임 끝났거나, 내 차례일 때) -> 숨김
-            else {
-                opponentSecretSetupArea.classList.add('hidden');
-            }
-        }
-        
-        // --- 초기화 및 리스너 연결 ---
-        
-        // 비밀 숫자 입력 시 버튼 활성화/비활성화 (내 비밀 숫자)
-        secretInput.addEventListener('input', () => {
-            setSecretBtn.disabled = !isValidSecret(secretInput.value.trim());
-            secretErrorEl.classList.add('hidden');
         });
 
-        // 상대방 비밀 숫자 입력 시 버튼 활성화/비활성화 (로컬 헬퍼)
-        opponentSecretInput.addEventListener('input', () => {
-            setOpponentSecretBtn.disabled = !isValidSecret(opponentSecretInput.value.trim());
-            opponentSecretErrorEl.classList.add('hidden');
-        });
 
-        // 추측 입력 시 버튼 활성화/비활성화
-        guessInput.addEventListener('input', () => {
-            if (!guessInput.disabled) {
-                submitGuessBtn.disabled = !isValidSecret(guessInput.value.trim());
-            }
-            guessErrorEl.classList.add('hidden');
-        });
-
-        // 추측 제출 버튼 리스너 연결
-        submitGuessBtn.addEventListener('click', handleSubmitGuess);
-        
-        // 상대방 비밀 숫자 설정 버튼 리스너 연결
-        setOpponentSecretBtn.addEventListener('click', handleSetOpponentSecret);
-
-        // 로비로 돌아가기 버튼 (로컬 스토리지 데이터 초기화)
-        backToLobbyBtn.addEventListener('click', () => {
-             // 현재 게임 세션 데이터만 삭제하고 로비로 이동
-             localStorage.removeItem(LOCAL_STORAGE_KEY);
-             localStorage.removeItem('gameId');
-             localStorage.removeItem('myRole');
-             window.location.href = 'index.html';
-        });
-
-        // 게임 시작
-        loadGameData();
+        // --- 초기화 ---
+        initializeFirebase();
     </script>
 </body>
 </html>
