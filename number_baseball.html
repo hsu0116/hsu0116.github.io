@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>온라인 숫자 야구 게임 (Baseball Number Game)</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary': '#4f46e5',
+                        'secondary': '#8b5cf6',
+                        'success': '#10b981',
+                        'error': '#ef4444',
+                        'light-gray': '#f3f4f6',
+                        'dark-text': '#1f2937'
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .game-card {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .strike { color: #4f46e5; font-weight: 700; }
+        .ball { color: #8b5cf6; font-weight: 700; }
+        .out { color: #ef4444; font-weight: 700; }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <!-- Game Card Container -->
+    <div id="app" class="game-card bg-white w-full max-w-lg rounded-xl p-6 md:p-8 space-y-6">
+        <h1 class="text-3xl font-extrabold text-primary text-center">⚾ 숫자 야구 게임 ⚾</h1>
+        <!-- 4자리로 변경된 안내 문구 -->
+        <p class="text-center text-sm text-gray-500">4자리 비밀 숫자를 맞춰보세요! (숫자는 서로 달라야 합니다: 예. 1234)</p>
+
+        <!-- Status and Game Info -->
+        <div class="bg-light-gray p-4 rounded-lg flex justify-between items-center text-dark-text text-sm">
+            <span>게임 ID: <span id="game-id-display" class="font-mono font-bold text-primary">로딩 중...</span></span>
+            <span id="game-status" class="font-bold text-primary">준비 중</span>
+        </div>
+
+        <!-- Ready Section (Visible in WAITING state) -->
+        <div id="ready-section" class="flex flex-col space-y-4">
+            <div id="ready-status-display" class="text-center text-sm font-medium text-purple-600">참가자 준비 상태: 0/2명</div>
+            <button id="ready-button" onclick="handleReady()"
+                    class="w-full bg-secondary text-white py-3 rounded-lg font-bold text-lg hover:bg-purple-600 transition-colors shadow-lg shadow-secondary/50 disabled:bg-gray-400 disabled:shadow-none">
+                준비 완료 (Ready)
+            </button>
+            <!-- 새 게임 시작 버튼은 OVER 상태일 때만 표시됨 -->
+            <button id="new-game-button" onclick="startNewGame()"
+                    class="w-full bg-secondary text-white py-2 rounded-lg font-medium text-sm hover:bg-purple-600 transition-colors hidden">
+                새 게임 시작
+            </button>
+        </div>
+
+
+        <!-- Guess Input and Button (Visible in PLAYING state) -->
+        <div id="input-section" class="flex flex-col space-y-4 hidden">
+            <!-- maxlength=4 로 변경 -->
+            <input type="text" id="guess-input" maxlength="4"
+                   class="w-full px-4 py-3 border-2 border-primary rounded-lg text-lg font-mono text-center focus:outline-none focus:ring-2 focus:ring-secondary"
+                   placeholder="4자리 숫자 입력 (예: 1234)" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 4);">
+            <button id="guess-button" onclick="handleGuess()"
+                    class="w-full bg-primary text-white py-3 rounded-lg font-bold text-lg hover:bg-indigo-600 transition-colors shadow-lg shadow-primary/50 disabled:bg-gray-400 disabled:shadow-none"
+                    disabled>
+                추측하기 (Guess)
+            </button>
+            <p id="error-message" class="text-error text-sm text-center font-medium hidden">유효하지 않은 입력입니다.</p>
+        </div>
+
+        <!-- Game History -->
+        <div class="space-y-3">
+            <h2 class="text-xl font-bold text-dark-text border-b pb-1">기록 (History)</h2>
+            <div id="history-container" class="max-h-60 overflow-y-auto bg-white rounded-lg border">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-light-gray sticky top-0">
+                        <tr>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/5">#</th>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-2/5">추측 (Guess)</th>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-2/5">결과 (Result)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-body" class="bg-white divide-y divide-gray-200">
+                        <!-- History rows will be inserted here -->
+                    </tbody>
+                </table>
+                <p id="no-history" class="p-4 text-center text-gray-400 text-sm">아직 기록이 없습니다.</p>
+            </div>
+        </div>
+
+        <!-- Game Over Modal (Hidden by default) -->
+        <div id="game-over-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div class="bg-white rounded-xl p-8 text-center space-y-4 w-full max-w-sm">
+                <h3 class="text-3xl font-extrabold text-success">🎉 게임 승리! 🎉</h3>
+                <p class="text-lg text-dark-text">비밀 숫자는 <span id="final-code" class="font-mono text-primary font-bold"></span> 였습니다!</p>
+                <p class="text-sm text-gray-600">총 <span id="final-tries" class="font-bold"></span>번의 시도만에 성공했습니다.</p>
+                <!-- 새 게임 시작 버튼을 모달 내에서도 사용할 수 있도록 수정 -->
+                <button onclick="hideGameOverModal(); startNewGame();"
+                        class="mt-4 w-full bg-secondary text-white py-3 rounded-lg font-bold hover:bg-purple-600 transition-colors">
+                    새 게임 시작하기
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot, collection, serverTimestamp, getDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase Setup and Global Variables
+        setLogLevel('Debug');
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const __initial_auth_token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        const __app_id = typeof __app_id !== 'undefined' ? __app_id : 'baseball-default-app';
+
+        let db, auth;
+        let userId = null;
+        let isAuthReady = false;
+        let gameListener = null;
+
+        // Game Constants
+        const NUM_DIGITS = 4; // 4자리로 변경
+        const MIN_PLAYERS = 2; // 최소 참가자 수 (여자친구와 둘이서)
+        const GAME_PATH = `artifacts/${__app_id}/public/data/baseball_games`;
+        const GAME_DOC_ID = 'shared_game';
+        let GAME_REF; // Will be initialized after Firestore setup
+
+        // UI elements
+        const guessInput = document.getElementById('guess-input');
+        const guessButton = document.getElementById('guess-button');
+        const inputSection = document.getElementById('input-section');
+        const readyButton = document.getElementById('ready-button');
+        const readySection = document.getElementById('ready-section');
+        const readyStatusDisplay = document.getElementById('ready-status-display');
+        const newGameButton = document.getElementById('new-game-button');
+        const historyBody = document.getElementById('history-body');
+        const errorMessage = document.getElementById('error-message');
+        const gameStatusDisplay = document.getElementById('game-status');
+        const gameIdDisplay = document.getElementById('game-id-display');
+        const gameOverModal = document.getElementById('game-over-modal');
+
+        // Global game state variable to prevent race conditions on modal display
+        let currentStatus = 'WAITING'; 
+
+        window.hideGameOverModal = () => {
+            gameOverModal.classList.add('hidden');
+        };
+
+        /**
+         * Initializes Firebase and sets up authentication.
+         */
+        async function initializeFirebase() {
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                GAME_REF = doc(db, GAME_PATH, GAME_DOC_ID); // Firestore Reference 초기화
+
+                gameIdDisplay.textContent = __app_id;
+
+                // Sign in with custom token or anonymously
+                if (__initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                // Wait for auth state to be ready
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        isAuthReady = true;
+                        console.log("Firebase Auth Ready. User ID:", userId);
+                        setupGameListener();
+                    } else {
+                        // This case handles anonymous sign-in failure or sign out (unlikely here)
+                        isAuthReady = true; 
+                        console.log("Signed in anonymously or auth ready but no user.");
+                        setupGameListener();
+                    }
+                });
+
+            } catch (error) {
+                console.error("Firebase 초기화 오류:", error);
+                gameStatusDisplay.textContent = '오류';
+                gameStatusDisplay.classList.remove('text-success', 'text-error', 'text-primary');
+                gameStatusDisplay.classList.add('text-error');
+            }
+        }
+
+        /**
+         * Generates a 4-digit number with unique digits.
+         * @returns {string} The secret code.
+         */
+        function generateSecretCode() {
+            const digits = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+            // Shuffle and pick 4 unique digits (NUM_DIGITS)
+            for (let i = digits.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [digits[i], digits[j]] = [digits[j], digits[i]];
+            }
+            const codeArray = digits.slice(0, NUM_DIGITS);
+            
+            // Ensure the first digit is not 0 (standard baseball rule)
+            if (codeArray[0] === 0) {
+                 // Swap with a non-zero digit from the remaining pool or the code array
+                 let isSwapped = false;
+                 // Try swapping with a non-zero digit in the first 4 (codeArray)
+                 for(let i = 1; i < NUM_DIGITS; i++) {
+                     if(codeArray[i] !== 0) {
+                         [codeArray[0], codeArray[i]] = [codeArray[i], codeArray[0]];
+                         isSwapped = true;
+                         break;
+                     }
+                 }
+                 // If all the first 4 were 0, then we must pick from the remaining 6 (should not happen with a proper shuffle, but as a robust measure)
+                 if (!isSwapped) {
+                     for (let i = NUM_DIGITS; i < digits.length; i++) {
+                         if (digits[i] !== 0) {
+                             codeArray[0] = digits[i]; // Replace 0 with the non-zero digit
+                             isSwapped = true;
+                             break;
+                         }
+                     }
+                 }
+            }
+            return codeArray.join('');
+        }
+
+        /**
+         * Calculates strikes and balls for 4 digits.
+         * @param {string} secret The 4-digit secret code.
+         * @param {string} guess The 4-digit guess.
+         * @returns {{strikes: number, balls: number}} The result.
+         */
+        function calculateScore(secret, guess) {
+            let strikes = 0;
+            let balls = 0;
+
+            for (let i = 0; i < NUM_DIGITS; i++) {
+                if (secret[i] === guess[i]) {
+                    strikes++;
+                } else if (secret.includes(guess[i])) {
+                    balls++;
+                }
+            }
+            return { strikes, balls };
+        }
+
+        /**
+         * Attempts to start a new game by resetting the Firestore document.
+         */
+        window.startNewGame = async function() {
+            if (!isAuthReady) return;
+
+            const newCode = generateSecretCode();
+            console.log("New Secret Code Generated (Debug Only):", newCode);
+
+            const initialGameState = {
+                secretCode: newCode,
+                guesses: [],
+                status: 'PLAYING',
+                startTime: serverTimestamp(),
+                lastResetBy: userId, 
+                readyUsers: {} // Ready state is reset
+            };
+
+            try {
+                // Use setDoc to overwrite completely, ensuring a clean state
+                await setDoc(GAME_REF, initialGameState);
+                console.log("새 게임이 시작되었습니다.");
+                hideGameOverModal();
+            } catch (e) {
+                console.error("새 게임 시작 실패:", e);
+                errorMessage.textContent = '새 게임을 시작하는 데 실패했습니다.';
+                errorMessage.classList.remove('hidden');
+                setTimeout(() => errorMessage.classList.add('hidden'), 3000);
+            }
+        };
+
+        /**
+         * Handles the user clicking the Ready button.
+         */
+        window.handleReady = async function() {
+            if (!isAuthReady || !userId) return;
+
+            try {
+                // Set this user's ready status in the Firestore map
+                await setDoc(GAME_REF, {
+                    readyUsers: {
+                        [userId]: true
+                    }
+                }, { merge: true });
+
+                readyButton.disabled = true;
+                readyButton.textContent = '준비 완료됨';
+                console.log(`User ${userId} is ready.`);
+                
+            } catch (e) {
+                console.error("준비 완료 상태 업데이트 실패:", e);
+                errorMessage.textContent = '준비 상태를 기록하는 데 실패했습니다.';
+                errorMessage.classList.remove('hidden');
+                setTimeout(() => errorMessage.classList.add('hidden'), 3000);
+            }
+        };
+
+
+        /**
+         * Handles the user's guess submission.
+         */
+        window.handleGuess = async function() {
+            if (!isAuthReady) return;
+
+            const guess = guessInput.value.trim();
+            const guessArray = Array.from(new Set(guess.split('')));
+            
+            // 1. Validation (must be 4 unique digits)
+            if (guess.length !== NUM_DIGITS || guessArray.length !== NUM_DIGITS) {
+                errorMessage.textContent = `${NUM_DIGITS}자리, 중복되지 않는 숫자를 입력하세요.`;
+                errorMessage.classList.remove('hidden');
+                setTimeout(() => errorMessage.classList.add('hidden'), 3000);
+                return;
+            }
+            errorMessage.classList.add('hidden');
+            guessInput.value = ''; // Clear input immediately
+
+            try {
+                const gameDoc = await getDoc(GAME_REF);
+                const gameState = gameDoc.data();
+
+                if (!gameState || gameState.status !== 'PLAYING') {
+                    console.warn("게임이 진행 중이 아닙니다.");
+                    errorMessage.textContent = '게임이 진행 중이 아닙니다. 준비를 완료하거나 새 게임을 시작해 주세요.';
+                    errorMessage.classList.remove('hidden');
+                    return;
+                }
+
+                const secret = gameState.secretCode;
+                const { strikes, balls } = calculateScore(secret, guess);
+                const newGuesses = gameState.guesses || [];
+                const guessResult = `${strikes}S ${balls}B`;
+                
+                const newGuessEntry = {
+                    guess: guess,
+                    result: guessResult,
+                    strikes: strikes,
+                    balls: balls,
+                    timestamp: serverTimestamp(),
+                    userId: userId,
+                };
+
+                newGuesses.push(newGuessEntry);
+                let newStatus = 'PLAYING';
+
+                if (strikes === NUM_DIGITS) { // 4 Strike = Win
+                    newStatus = 'OVER';
+                    // Show modal immediately for the user who guessed correctly
+                    showGameOverModal(secret, newGuesses.length); 
+                }
+
+                await setDoc(GAME_REF, {
+                    guesses: newGuesses,
+                    status: newStatus,
+                }, { merge: true });
+
+            } catch (e) {
+                console.error("추측 전송 실패:", e);
+                errorMessage.textContent = '추측을 기록하는 데 실패했습니다. 다시 시도해 주세요.';
+                errorMessage.classList.remove('hidden');
+            }
+        };
+
+        /**
+         * Sets up the Firestore real-time listener for the game state.
+         */
+        function setupGameListener() {
+            if (!isAuthReady) return;
+            // Clear existing listener if it exists
+            if (gameListener) gameListener();
+
+            gameListener = onSnapshot(GAME_REF, async (docSnapshot) => {
+                if (docSnapshot.exists()) {
+                    const data = docSnapshot.data();
+                    
+                    // Update global status
+                    currentStatus = data.status || 'WAITING';
+                    
+                    updateUI(data);
+
+                    // Auto-start logic (WAITING -> PLAYING)
+                    const readyUsersCount = data.readyUsers ? Object.keys(data.readyUsers).length : 0;
+                    
+                    if (currentStatus === 'WAITING' && readyUsersCount >= MIN_PLAYERS) {
+                        console.log("Minimum players ready. Starting game...");
+                        // Only one client needs to trigger startNewGame
+                        await startNewGame(); 
+                        
+                    } else if (currentStatus === 'WAITING' && data.secretCode) {
+                         // Fallback: If status is WAITING but a code exists (from old game), reset it
+                         console.log("WAITING state with old code found. Resetting.");
+                         await setDoc(GAME_REF, { status: 'WAITING', secretCode: null, guesses: [], readyUsers: {} }, { merge: false });
+                    }
+
+                } else {
+                    // Document does not exist (very first time), create the initial structure
+                    console.log("Game document missing. Creating initial document.");
+                    await setDoc(GAME_REF, {
+                        secretCode: null,
+                        guesses: [],
+                        status: 'WAITING',
+                        startTime: serverTimestamp(),
+                        readyUsers: {}
+                    });
+                }
+            }, (error) => {
+                console.error("Firestore 리스너 오류:", error);
+                gameStatusDisplay.textContent = '데이터 연결 오류';
+                gameStatusDisplay.classList.remove('text-success', 'text-error', 'text-primary');
+                gameStatusDisplay.classList.add('text-error');
+            });
+        }
+
+        /**
+         * Updates the UI based on the latest game data.
+         * @param {Object} data The game state object from Firestore.
+         */
+        function updateUI(data) {
+            const guesses = data.guesses || [];
+            const status = currentStatus; // Use the globally set status
+            const readyUsers = data.readyUsers || {};
+            const readyUsersCount = Object.keys(readyUsers).length;
+
+            // 1. Update Status Display
+            let statusText = '준비 중';
+            let statusClass = 'text-primary';
+            if (status === 'PLAYING') {
+                statusText = '게임 중';
+                statusClass = 'text-success';
+            } else if (status === 'OVER') {
+                statusText = '게임 종료';
+                statusClass = 'text-error';
+            }
+            gameStatusDisplay.textContent = statusText;
+            gameStatusDisplay.className = '';
+            gameStatusDisplay.classList.add('font-bold', statusClass);
+            
+            // 2. Control Sections and Buttons
+            const isPlaying = status === 'PLAYING';
+            const isWaiting = status === 'WAITING';
+            const isOver = status === 'OVER';
+            
+            // Toggle input/guess section
+            inputSection.classList.toggle('hidden', !isPlaying);
+            guessButton.disabled = !isPlaying;
+            guessInput.disabled = !isPlaying;
+            
+            // Toggle ready/new game section
+            readySection.classList.toggle('hidden', isPlaying);
+            // Show New Game button only when OVER
+            newGameButton.classList.toggle('hidden', !isOver); 
+            // Show Ready button only when WAITING
+            readyButton.classList.toggle('hidden', !isWaiting); 
+            // Show Ready status text only when WAITING
+            readyStatusDisplay.classList.toggle('hidden', !isWaiting); 
+
+            // Update ready status display text
+            readyStatusDisplay.textContent = `참가자 준비 상태: ${readyUsersCount}/${MIN_PLAYERS}명`;
+
+            // Control Ready Button state
+            if (isWaiting) {
+                if (userId && readyUsers[userId]) {
+                    readyButton.disabled = true;
+                    readyButton.textContent = '준비 완료됨';
+                } else {
+                    readyButton.disabled = false;
+                    readyButton.textContent = '준비 완료 (Ready)';
+                }
+            }
+
+
+            // 3. Update History Table
+            historyBody.innerHTML = '';
+            const noHistory = document.getElementById('no-history');
+
+            if (guesses.length === 0) {
+                noHistory.classList.remove('hidden');
+            } else {
+                noHistory.classList.add('hidden');
+                
+                // We reverse the array for display (latest first)
+                guesses.slice().reverse().forEach((entry, index) => {
+                    const row = historyBody.insertRow(); // Insert at the top (index 0)
+                    
+                    // Style the result
+                    const resultText = entry.result.replace(/(\d+)S/, `<span class="strike">$1S</span>`).replace(/(\d+)B/, `<span class="ball">$1B</span>`);
+                    
+                    const guessNumber = guesses.length - index;
+                    
+                    row.innerHTML = `
+                        <td class="px-3 py-2 whitespace-nowrap text-sm text-gray-500">${guessNumber}</td>
+                        <td class="px-3 py-2 whitespace-nowrap text-lg font-mono text-dark-text">${entry.guess}</td>
+                        <td class="px-3 py-2 whitespace-nowrap text-base font-bold text-dark-text">${entry.strikes === 0 && entry.balls === 0 ? '<span class="out">OUT</span>' : resultText}</td>
+                    `;
+                    
+                    // Check for win condition in the snapshot
+                    if (entry.strikes === NUM_DIGITS && status === 'OVER') {
+                        // This ensures the modal shows for all players, not just the one who guessed
+                        showGameOverModal(data.secretCode, guesses.length);
+                    }
+                });
+            }
+        }
+
+        /**
+         * Shows the Game Over Modal.
+         * @param {string} code The secret code.
+         * @param {number} tries The number of attempts.
+         */
+        function showGameOverModal(code, tries) {
+            // Check status (globally or locally) AND if modal is hidden
+            if (currentStatus === 'OVER' && gameOverModal.classList.contains('hidden')) {
+                document.getElementById('final-code').textContent = code;
+                document.getElementById('final-tries').textContent = tries;
+                gameOverModal.classList.remove('hidden');
+            }
+        }
+
+        // Initialize on load
+        initializeFirebase();
+    </script>
+</body>
+</html>
