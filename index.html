@@ -44,19 +44,27 @@
         <!-- 4자리로 변경된 안내 문구 -->
         <p class="text-center text-sm text-gray-500">4자리 비밀 숫자를 맞춰보세요! (숫자는 서로 달라야 합니다: 예. 1234)</p>
 
-        <!-- Status and Game Info -->
-        <div class="bg-light-gray p-4 rounded-lg flex justify-between items-center text-dark-text text-sm">
+        <!-- Status and Game Info (User ID Display Added) -->
+        <div class="bg-light-gray p-4 rounded-lg flex justify-between items-center text-dark-text text-sm flex-wrap gap-2">
             <span>게임 ID: <span id="game-id-display" class="font-mono font-bold text-primary">로딩 중...</span></span>
+            <span>내 ID: <span id="user-id-display" class="font-mono text-xs text-gray-700">인증 중...</span></span>
             <span id="game-status" class="font-bold text-primary">준비 중</span>
         </div>
 
         <!-- Ready Section (Visible in WAITING state) -->
         <div id="ready-section" class="flex flex-col space-y-4">
-            <div id="ready-status-display" class="text-center text-sm font-medium text-purple-600">참가자 준비 상태: 0/2명</div>
+            <div id="ready-status-container" class="space-y-2">
+                <div id="ready-status-display" class="text-center text-sm font-medium text-purple-600">참가자 준비 상태: 0/2명</div>
+                <!-- 준비 완료된 사용자 ID 목록을 표시하는 곳 -->
+                <div id="ready-users-list" class="text-center text-xs text-gray-500 italic min-h-[1.5em]">준비 중인 사용자가 없습니다.</div>
+            </div>
+            
             <button id="ready-button" onclick="handleReady()"
-                    class="w-full bg-secondary text-white py-3 rounded-lg font-bold text-lg hover:bg-purple-600 transition-colors shadow-lg shadow-secondary/50 disabled:bg-gray-400 disabled:shadow-none">
-                준비 완료 (Ready)
+                    class="w-full bg-secondary text-white py-3 rounded-lg font-bold text-lg hover:bg-purple-600 transition-colors shadow-lg shadow-secondary/50 disabled:bg-gray-400 disabled:shadow-none"
+                    disabled>
+                준비 중...
             </button>
+            
             <!-- 새 게임 시작 버튼은 OVER 상태일 때만 표시됨 -->
             <button id="new-game-button" onclick="startNewGame()"
                     class="w-full bg-secondary text-white py-2 rounded-lg font-medium text-sm hover:bg-purple-600 transition-colors hidden">
@@ -145,11 +153,13 @@
         const readyButton = document.getElementById('ready-button');
         const readySection = document.getElementById('ready-section');
         const readyStatusDisplay = document.getElementById('ready-status-display');
+        const readyUsersList = document.getElementById('ready-users-list'); // NEW
         const newGameButton = document.getElementById('new-game-button');
         const historyBody = document.getElementById('history-body');
         const errorMessage = document.getElementById('error-message');
         const gameStatusDisplay = document.getElementById('game-status');
         const gameIdDisplay = document.getElementById('game-id-display');
+        const userIdDisplay = document.getElementById('user-id-display');
         const gameOverModal = document.getElementById('game-over-modal');
 
         // Global game state variable to prevent race conditions on modal display
@@ -182,11 +192,15 @@
                 onAuthStateChanged(auth, (user) => {
                     if (user) {
                         userId = user.uid;
+                        // Display user ID, shortened for space but visible for identity
+                        userIdDisplay.textContent = userId.substring(0, 10) + '...'; 
                         isAuthReady = true;
                         console.log("Firebase Auth Ready. User ID:", userId);
                         setupGameListener();
                     } else {
-                        // This case handles anonymous sign-in failure or sign out (unlikely here)
+                        userIdDisplay.textContent = '인증 실패';
+                        readyButton.textContent = '인증 대기 중...';
+                        readyButton.disabled = true;
                         isAuthReady = true; 
                         console.log("Signed in anonymously or auth ready but no user.");
                         setupGameListener();
@@ -295,7 +309,12 @@
          * Handles the user clicking the Ready button.
          */
         window.handleReady = async function() {
-            if (!isAuthReady || !userId) return;
+            if (!isAuthReady || !userId) {
+                errorMessage.textContent = '인증 준비가 완료되지 않았습니다. 잠시 기다려 주세요.';
+                errorMessage.classList.remove('hidden');
+                setTimeout(() => errorMessage.classList.add('hidden'), 3000);
+                return;
+            }
 
             try {
                 // Set this user's ready status in the Firestore map
@@ -305,9 +324,8 @@
                     }
                 }, { merge: true });
 
-                readyButton.disabled = true;
-                readyButton.textContent = '준비 완료됨';
-                console.log(`User ${userId} is ready.`);
+                // **중요:** 로컬 버튼 상태 업데이트를 제거하고, 오직 onSnapshot을 통한 UI 업데이트에 의존합니다.
+                console.log(`User ${userId} is ready. Waiting for listener to update UI.`);
                 
             } catch (e) {
                 console.error("준비 완료 상태 업데이트 실패:", e);
@@ -461,7 +479,8 @@
             const isPlaying = status === 'PLAYING';
             const isWaiting = status === 'WAITING';
             const isOver = status === 'OVER';
-            
+            const isAuthChecked = isAuthReady && userId; // Check if authentication is complete
+
             // Toggle input/guess section
             inputSection.classList.toggle('hidden', !isPlaying);
             guessButton.disabled = !isPlaying;
@@ -469,29 +488,48 @@
             
             // Toggle ready/new game section
             readySection.classList.toggle('hidden', isPlaying);
-            // Show New Game button only when OVER
             newGameButton.classList.toggle('hidden', !isOver); 
-            // Show Ready button only when WAITING
             readyButton.classList.toggle('hidden', !isWaiting); 
-            // Show Ready status text only when WAITING
-            readyStatusDisplay.classList.toggle('hidden', !isWaiting); 
 
             // Update ready status display text
             readyStatusDisplay.textContent = `참가자 준비 상태: ${readyUsersCount}/${MIN_PLAYERS}명`;
 
-            // Control Ready Button state
+
+            // 3. Control Ready Button state and Ready Users List
             if (isWaiting) {
-                if (userId && readyUsers[userId]) {
-                    readyButton.disabled = true;
-                    readyButton.textContent = '준비 완료됨';
+                // Show ready status
+                const readyIds = Object.keys(readyUsers);
+                if (readyIds.length > 0) {
+                    const idListHtml = readyIds.map(id => {
+                        // Shorten the ID for display
+                        const shortId = id.substring(0, 8);
+                        return `<span class="font-mono text-gray-700">${shortId}...</span>`;
+                    }).join(', ');
+                    readyUsersList.innerHTML = `준비 완료: ${idListHtml}`;
                 } else {
-                    readyButton.disabled = false;
-                    readyButton.textContent = '준비 완료 (Ready)';
+                    readyUsersList.textContent = '준비 중인 사용자가 없습니다.';
                 }
+
+                // Control Ready Button state
+                if (isAuthChecked) {
+                    if (readyUsers[userId]) {
+                        readyButton.disabled = true;
+                        readyButton.textContent = '준비 완료됨 (상대방 대기 중)';
+                    } else {
+                        readyButton.disabled = false;
+                        readyButton.textContent = '준비 완료 (Ready)';
+                    }
+                } else {
+                    // Auth not ready yet
+                    readyButton.disabled = true;
+                    readyButton.textContent = '인증 중...';
+                }
+            } else {
+                readyUsersList.textContent = ''; // Clear list when not waiting
             }
 
 
-            // 3. Update History Table
+            // 4. Update History Table
             historyBody.innerHTML = '';
             const noHistory = document.getElementById('no-history');
 
@@ -502,7 +540,7 @@
                 
                 // We reverse the array for display (latest first)
                 guesses.slice().reverse().forEach((entry, index) => {
-                    const row = historyBody.insertRow(); // Insert at the top (index 0)
+                    const row = historyBody.insertRow();
                     
                     // Style the result
                     const resultText = entry.result.replace(/(\d+)S/, `<span class="strike">$1S</span>`).replace(/(\d+)B/, `<span class="ball">$1B</span>`);
