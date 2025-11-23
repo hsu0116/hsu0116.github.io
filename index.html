@@ -3,149 +3,230 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>온라인 숫자 야구 게임 (Baseball Number Game)</title>
+    <title>⚾️ 2인 숫자 야구 - 시작</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
             theme: {
                 extend: {
-                    colors: {
-                        'primary': '#4f46e5',
-                        'secondary': '#8b5cf6',
-                        'success': '#10b981',
-                        'error': '#ef4444',
-                        'light-gray': '#f3f4f6',
-                        'dark-text': '#1f2937'
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
                     },
+                    colors: {
+                        'primary': '#2c3e50',
+                        'secondary': '#3498db',
+                        'accent': '#2ecc71',
+                    }
                 }
             }
         }
     </script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6;
-        }
-        .game-card {
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 4px, 6px, 0.05);
-        }
-        .strike { color: #4f46e5; font-weight: 700; }
-        .ball { color: #8b5cf6; font-weight: 700; }
-        .out { color: #ef4444; font-weight: 700; }
-    </style>
 </head>
-<body class="flex items-center justify-center min-h-screen p-4">
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4 font-sans">
 
-    <!-- Game Card Container -->
-    <div id="app" class="game-card bg-white w-full max-w-lg rounded-xl p-6 md:p-8 space-y-6">
-        <h1 class="text-3xl font-extrabold text-primary text-center">⚾ 숫자 야구 게임 ⚾</h1>
-        <!-- 4자리로 변경된 안내 문구 -->
-        <p class="text-center text-sm text-gray-500">4자리 비밀 숫자를 맞춰보세요! (숫자는 서로 달라야 합니다: 예. 1234)</p>
+    <div id="app-container" class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md space-y-6">
+        <h1 class="text-3xl font-bold text-center text-primary">
+            ⚾️ 2인 숫자 야구
+        </h1>
+        <p class="text-center text-gray-500 mb-6">
+            닉네임을 설정하고 게임에 접속하세요.
+        </p>
 
-        <!-- Status and Game Info (User ID Display Added) -->
-        <div class="bg-light-gray p-4 rounded-lg flex justify-between items-center text-dark-text text-sm flex-wrap gap-2">
-            <span>게임 ID: <span id="game-id-display" class="font-mono font-bold text-primary">로딩 중...</span></span>
-            <span>내 ID: <span id="user-id-display" class="font-mono text-xs text-gray-700">인증 중...</span></span>
-            <span id="game-status" class="font-bold text-primary">준비 중</span>
-        </div>
-
-        <!-- Ready Section (Visible in WAITING state) -->
-        <div id="ready-section" class="flex flex-col space-y-4">
-            <div id="ready-status-container" class="space-y-2">
-                <div id="ready-status-display" class="text-center text-sm font-medium text-purple-600">참가자 준비 상태: 0/2명</div>
-                <!-- 준비 완료된 사용자 ID 목록을 표시하는 곳 -->
-                <div id="ready-users-list" class="text-center text-xs text-gray-500 italic min-h-[1.5em]">인증 중...</div>
-            </div>
-            
-            <button id="ready-button" onclick="handleReady()"
-                    class="w-full bg-secondary text-white py-3 rounded-lg font-bold text-lg hover:bg-purple-600 transition-colors shadow-lg shadow-secondary/50 disabled:bg-gray-400 disabled:shadow-none"
-                    disabled>
-                인증 중...
-            </button>
-
-            <!-- 수동 게임 시작 버튼 추가 -->
-            <button id="manual-start-button" onclick="handleManualStart()"
-                    class="w-full bg-success text-white py-3 rounded-lg font-bold text-lg hover:bg-green-600 transition-colors shadow-lg shadow-success/50 disabled:bg-gray-400 disabled:shadow-none hidden">
-                2명 이상 준비 완료! 게임 시작
-            </button>
-            
-            <!-- 새 게임 시작 버튼은 OVER 상태일 때만 표시됨 -->
-            <button id="new-game-button" onclick="startNewGame()"
-                    class="w-full bg-secondary text-white py-2 rounded-lg font-medium text-sm hover:bg-purple-600 transition-colors hidden">
-                새 게임 시작
-            </button>
-        </div>
-
-
-        <!-- Guess Input and Button (Visible in PLAYING state) -->
-        <div id="input-section" class="flex flex-col space-y-4 hidden">
-            <!-- maxlength=4 로 변경 -->
-            <input type="text" id="guess-input" maxlength="4"
-                   class="w-full px-4 py-3 border-2 border-primary rounded-lg text-lg font-mono text-center focus:outline-none focus:ring-2 focus:ring-secondary"
-                   placeholder="4자리 숫자 입력 (예: 1234)" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 4);">
-            <button id="guess-button" onclick="handleGuess()"
-                    class="w-full bg-primary text-white py-3 rounded-lg font-bold text-lg hover:bg-indigo-600 transition-colors shadow-lg shadow-primary/50 disabled:bg-gray-400 disabled:shadow-none"
-                    disabled>
-                추측하기 (Guess)
-            </button>
-            <p id="error-message" class="text-error text-sm text-center font-medium hidden">유효하지 않은 입력입니다.</p>
-        </div>
-
-        <!-- Game History -->
-        <div class="space-y-3">
-            <h2 class="text-xl font-bold text-dark-text border-b pb-1">기록 (History)</h2>
-            <div id="history-container" class="max-h-60 overflow-y-auto bg-white rounded-lg border">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-light-gray sticky top-0">
-                        <tr>
-                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/5">#</th>
-                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-2/5">추측 (Guess)</th>
-                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-2/5">결과 (Result)</th>
-                        </tr>
-                    </thead>
-                    <tbody id="history-body" class="bg-white divide-y divide-gray-200">
-                        <!-- History rows will be inserted here -->
-                    </tbody>
-                </table>
-                <p id="no-history" class="p-4 text-center text-gray-400 text-sm">아직 기록이 없습니다.</p>
+        <!-- 닉네임 입력 -->
+        <div class="space-y-4">
+            <div>
+                <label for="player-nickname" class="block text-sm font-medium text-gray-700 mb-1">내 닉네임</label>
+                <input type="text" id="player-nickname" placeholder="닉네임을 입력하세요"
+                       class="w-full p-3 border border-gray-300 rounded-lg focus:ring-secondary focus:border-secondary transition duration-150">
             </div>
         </div>
 
-        <!-- Game Over Modal (Hidden by default) -->
-        <div id="game-over-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div class="bg-white rounded-xl p-8 text-center space-y-4 w-full max-w-sm">
-                <h3 class="text-3xl font-extrabold text-success">🎉 게임 승리! 🎉</h3>
-                <p class="text-lg text-dark-text">비밀 숫자는 <span id="final-code" class="font-mono text-primary font-bold"></span> 였습니다!</p>
-                <p class="text-sm text-gray-600">총 <span id="final-tries" class="font-bold"></span>번의 시도만에 성공했습니다.</p>
-                <!-- 새 게임 시작 버튼을 모달 내에서도 사용할 수 있도록 수정 -->
-                <button onclick="hideGameOverModal(); startNewGame();"
-                        class="mt-4 w-full bg-secondary text-white py-3 rounded-lg font-bold hover:bg-purple-600 transition-colors">
-                    새 게임 시작하기
-                </button>
-            </div>
+        <!-- 상태 메시지 및 버튼 -->
+        <div id="status-message" class="text-center text-sm font-semibold text-blue-600">
+            <span id="auth-status">데이터베이스 연결 중...</span>
         </div>
+
+        <button id="start-game-btn" disabled
+                class="w-full py-3 px-4 bg-secondary text-white font-bold rounded-lg shadow-md hover:bg-blue-700 transition duration-300 disabled:bg-gray-400">
+            게임 시작 / 방 찾기
+        </button>
+        
+        <p class="text-xs text-center text-gray-400 pt-4">
+            내 ID: <span id="user-id-display" class="font-mono text-gray-600">불러오는 중</span>
+        </p>
     </div>
 
-    <!-- Firebase SDKs -->
+    <!-- Firebase SDK Imports -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot, collection, serverTimestamp, getDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, query, where, getDocs, collection, onSnapshot, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Firebase Setup and Global Variables
-        setLogLevel('Debug');
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-        const __initial_auth_token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-        const __app_id = typeof __app_id !== 'undefined' ? __app_id : 'baseball-default-app';
-
-        let db, auth;
+        // 전역 변수 초기화
+        let db;
+        let auth;
         let userId = null;
-        let isAuthReady = false;
-        let gameListener = null;
+        let appId = null;
 
-        // Game Constants
-        const NUM_DIGITS = 4; // 4자리로 변경
-        const MIN_PLAYERS = 2; // 최소 참가자 수 (여자친구와 둘이서)
-        const GAME_PATH =
+        const authStatusEl = document.getElementById('auth-status');
+        const startButton = document.getElementById('start-game-btn');
+        const nicknameInput = document.getElementById('player-nickname');
+        const userIdDisplay = document.getElementById('user-id-display');
+
+        // Firestore 컬렉션 경로 (모두가 접근 가능한 공개 데이터 경로 사용)
+        const getGameCollectionRef = () => collection(db, `artifacts/${appId}/public/data/number_baseball_games`);
+        
+        // --- 헬퍼 함수 ---
+
+        // 1. Firebase 초기화 및 인증
+        async function initFirebase() {
+            try {
+                // 캔버스 환경에서 제공되는 전역 변수 사용
+                const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+                appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+                if (!firebaseConfig.apiKey) {
+                    throw new Error("Firebase configuration is missing.");
+                }
+
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                authStatusEl.textContent = "사용자 인증 중...";
+
+                // 인증 토큰을 사용하여 로그인 시도 (캔버스 환경)
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    // 토큰이 없으면 익명으로 로그인 (일반 웹 환경)
+                    await signInAnonymously(auth);
+                }
+
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        userIdDisplay.textContent = userId;
+                        authStatusEl.textContent = "인증 완료. 닉네임을 입력해주세요.";
+                        startButton.disabled = false;
+                        
+                        // 이전에 저장된 닉네임 불러오기
+                        const savedNickname = localStorage.getItem('playerNickname');
+                        if (savedNickname) {
+                            nicknameInput.value = savedNickname;
+                        }
+                    } else {
+                        authStatusEl.textContent = "인증 실패.";
+                    }
+                });
+
+            } catch (error) {
+                console.error("Firebase 초기화 또는 인증 오류:", error);
+                authStatusEl.textContent = `오류: ${error.message}`;
+            }
+        }
+
+        // 2. 게임 시작/방 접속 처리
+        async function handleGameStart() {
+            if (!userId) {
+                alert("사용자 인증이 완료되지 않았습니다. 잠시 후 다시 시도해 주세요.");
+                return;
+            }
+
+            const nickname = nicknameInput.value.trim();
+            if (!nickname) {
+                alert("닉네임을 입력해 주세요.");
+                return;
+            }
+            
+            // 닉네임을 로컬 저장소에 저장
+            localStorage.setItem('playerNickname', nickname);
+
+            startButton.disabled = true;
+            authStatusEl.textContent = "게임 방을 찾는 중...";
+
+            try {
+                // 1. WAITING 상태인 방 찾기 (Player 2가 들어올 수 있는 방)
+                const q = query(getGameCollectionRef(), 
+                    where("status", "==", "WAITING"),
+                    where("player2_uid", "==", null) // player2가 없는 방만 찾기
+                );
+
+                const querySnapshot = await getDocs(q);
+                let gameId = null;
+
+                if (!querySnapshot.empty) {
+                    // A. 대기 중인 방이 있으면, Player 2로 참여
+                    const waitingDoc = querySnapshot.docs[0];
+                    gameId = waitingDoc.id;
+                    
+                    await runTransaction(db, async (transaction) => {
+                        const docRef = doc(getGameCollectionRef(), gameId);
+                        const freshDoc = await transaction.get(docRef);
+
+                        // 다시 한번 Player 2가 비어있는지 확인
+                        if (freshDoc.exists() && freshDoc.data().player2_uid === null) {
+                            transaction.update(docRef, {
+                                player2_uid: userId,
+                                player2_nickname: nickname,
+                                status: "SETUP" // 게임 세팅 단계로 전환
+                            });
+                        } else {
+                            // 이미 다른 사람이 참여했으므로 새로운 방 생성
+                            gameId = await createNewGame(nickname);
+                        }
+                    });
+
+                    if (gameId) {
+                         authStatusEl.textContent = `게임 참가 성공! (ID: ${gameId}). 게임 화면으로 이동합니다.`;
+                    }
+                } else {
+                    // B. 대기 중인 방이 없으면, Player 1로 새로운 방 생성
+                    gameId = await createNewGame(nickname);
+                    authStatusEl.textContent = `새로운 게임 방 생성 완료 (ID: ${gameId}). 상대방을 기다리는 중...`;
+                }
+
+                if (gameId) {
+                    // 게임 ID를 로컬에 저장하고, 실제 게임 화면으로 이동합니다.
+                    localStorage.setItem('gameId', gameId);
+                    window.location.href = 'game.html'; 
+                }
+
+            } catch (error) {
+                console.error("게임 시작/접속 오류:", error);
+                authStatusEl.textContent = `게임 접속 오류: ${error.message}`;
+                startButton.disabled = false;
+            }
+        }
+
+        // 3. 새로운 게임 방 생성
+        async function createNewGame(nickname) {
+            const gameRef = doc(getGameCollectionRef()); // Firestore가 새 ID를 자동 생성
+            const gameId = gameRef.id;
+
+            await setDoc(gameRef, {
+                gameId: gameId,
+                status: "WAITING", // 대기 중
+                createdAt: new Date().getTime(),
+                player1_uid: userId,
+                player1_nickname: nickname,
+                player2_uid: null, // 상대방 대기
+                player2_nickname: null,
+                player1_secret: null,
+                player2_secret: null,
+                turn: null,
+                logs: []
+            });
+            return gameId;
+        }
+
+        // 이벤트 리스너 연결
+        startButton.addEventListener('click', handleGameStart);
+
+        // 앱 시작
+        initFirebase();
+
+    </script>
+</body>
+</html>
