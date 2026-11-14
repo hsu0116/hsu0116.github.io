@@ -18,7 +18,9 @@ STREAM_LIMIT = 32 * 1024 * 1024
 
 
 class AgentRunner:
-    def __init__(self, store: StateStore, redactor, logs_dir: str | Path, save_output: bool = True):
+    def __init__(self, store: StateStore, redactor, logs_dir: str | Path, save_output: bool = True,
+                 on_policy_violation=None):
+        self.on_policy_violation = on_policy_violation
         self.store = store
         self.redact = redactor
         self.logs_dir = Path(logs_dir)
@@ -56,7 +58,8 @@ class AgentRunner:
         try:
             proc = await asyncio.create_subprocess_exec(
                 *inv.argv, cwd=inv.cwd, stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE, env=child_env(), limit=STREAM_LIMIT, **popen_kwargs())
+                stderr=asyncio.subprocess.PIPE, env=child_env(remove=inv.env_remove), limit=STREAM_LIMIT,
+                **popen_kwargs())
         except OSError as e:
             res = AgentResult(provider=inv.provider, exit_code=None, error=f"failed to start: {e}",
                               log_path=str(log_path))
@@ -83,6 +86,9 @@ class AgentRunner:
                 except Exception:
                     pass
 
+        violation: list[str] = []
+        abort_event = asyncio.Event()
+
         async def read_stream(stream, sink: list[str], is_err: bool) -> None:
             while True:
                 line_b = await stream.readline()
@@ -90,6 +96,11 @@ class AgentRunner:
                     break
                 line = line_b.decode("utf-8", errors="replace").rstrip("\r\n")
                 sink.append(line)
+                if not is_err and not violation:
+                    v = adapter.guard_line(line)
+                    if v:
+                        violation.append(v)
+                        abort_event.set()
                 if raw_f is not None and not is_err:
                     raw_f.write(self.redact(line) + "\n")
                 if is_err:
@@ -102,10 +113,14 @@ class AgentRunner:
                    asyncio.create_task(read_stream(proc.stderr, stderr_lines, True))]
         waiter = asyncio.create_task(proc.wait())
         cancel_waiter = asyncio.create_task(cancel_event.wait()) if cancel_event else None
+        abort_waiter = asyncio.create_task(abort_event.wait())
         try:
-            pending = {waiter} | ({cancel_waiter} if cancel_waiter else set())
+            pending = {waiter, abort_waiter} | ({cancel_waiter} if cancel_waiter else set())
             done, _ = await asyncio.wait(pending, timeout=timeout, return_when=asyncio.FIRST_COMPLETED)
-            if waiter not in done:
+            if abort_waiter in done:
+                write_log(f"[orchestrator] {violation[0]}")
+                await kill_process_tree_async(proc)
+            elif waiter not in done:
                 if cancel_waiter is not None and cancel_waiter in done:
                     cancelled = True
                     write_log("[orchestrator] cancellation requested - terminating process tree")
@@ -119,6 +134,7 @@ class AgentRunner:
             await kill_process_tree_async(proc)
             raise
         finally:
+            abort_waiter.cancel()
             if cancel_waiter is not None:
                 cancel_waiter.cancel()
             try:
@@ -147,7 +163,13 @@ class AgentRunner:
         res.timed_out = timed_out
         res.cancelled = cancelled
         res.log_path = str(log_path)
-        if timed_out:
+        if violation:
+            res.error = violation[0]
+            res.exit_code = res.exit_code if res.exit_code not in (0, None) else -1
+            self.store.log_event(run_id, violation[0], level="error", task_id=task_id)
+            if self.on_policy_violation:
+                self.on_policy_violation(violation[0])
+        elif timed_out:
             res.error = f"timed out after {timeout:.0f}s"
         elif cancelled:
             res.error = "cancelled"

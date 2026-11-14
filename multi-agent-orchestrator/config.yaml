@@ -1,5 +1,9 @@
 # Multi-agent orchestrator configuration. Every key is optional; omitted keys use the
 # defaults in orchestrator/config.py. Commands are always argument lists (never shell strings).
+#
+# Billing: agents ALWAYS use your subscription logins (Claude Pro/Max via `claude` login, ChatGPT via
+# `codex login`). API keys are stripped from agent processes and API-key logins are refused; this
+# cannot be turned off here. See orchestrator/subscription.py.
 
 agents:
   planner: claude
@@ -20,7 +24,7 @@ providers:
   claude:
     command: null                # e.g. ["C:/Users/me/.local/bin/claude.exe"]; null = find on PATH
     model: null                  # e.g. claude-sonnet-5-5 ; null = CLI default
-    max_budget_usd_per_call: 5.0
+    max_budget_usd_per_call: 5.0     # usage cap per call (API-equivalent estimate; Pro is not billed per call)
   codex:
     command: null                # null = find on PATH (npm .cmd shim is resolved to node + js)
     model: null
@@ -34,7 +38,7 @@ limits:
   max_task_retries: 1
   task_timeout_seconds: 1800
   max_tasks: 8
-  max_total_cost_usd: null       # e.g. 20.0 - stop starting new agents when reached
+  max_total_cost_usd: null       # usage cap per run (API-equivalent estimate), e.g. 5.0
 
 integration:
   method: cherry-pick

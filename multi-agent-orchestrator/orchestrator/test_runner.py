@@ -9,6 +9,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+from .subscription import ALL_BLOCKED_ENV
 from .procutil import child_env, kill_process_tree_async, popen_kwargs, resolve_command
 
 
@@ -69,7 +70,7 @@ async def run_tests(cmd: list[str] | None, cwd: str | Path, timeout: float, outp
     try:
         proc = await asyncio.create_subprocess_exec(*cmd, cwd=str(cwd), stdout=asyncio.subprocess.PIPE,
                                                     stderr=asyncio.subprocess.STDOUT, stdin=asyncio.subprocess.DEVNULL,
-                                                    env=child_env({"PYTHONDONTWRITEBYTECODE": "1"}),
+                                                    env=child_env({"PYTHONDONTWRITEBYTECODE": "1"}, remove=ALL_BLOCKED_ENV),
                                                     **popen_kwargs())
     except OSError as e:
         return TestOutcome(cmd, False, None, False, f"failed to start test command: {e}", 0.0)

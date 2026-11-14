@@ -97,8 +97,17 @@ def main() -> int:
     if "--version" in argv:
         print(f"fake-{flavor} 0.0.0")
         return 0
-    if flavor == "codex" and argv[:2] == ["login", "status"]:
-        print("Logged in using fake credentials")
+    # environment variables the orchestrator must strip (API keys) - recorded for tests
+    leaked = sorted(k for k in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENAI_API_KEY", "CODEX_API_KEY")
+                    if k in os.environ)
+    if flavor == "claude" and argv[:2] == ["auth", "status"]:
+        print(os.environ.get("ORCH_FAKE_CLAUDE_AUTH") or json.dumps(
+            {"loggedIn": True, "authMethod": "claude.ai", "apiProvider": "firstParty", "subscriptionType": "pro"}))
+        return 0
+    if flavor == "codex" and argv[-2:] == ["login", "status"]:
+        _log({"event": "login_status", "provider": flavor, "purpose": "login", "task": "", "t": time.time(),
+              "argv": argv, "leaked_env": leaked})
+        print(os.environ.get("ORCH_FAKE_CODEX_LOGIN", "Logged in using ChatGPT"))
         return 0
     prompt = sys.stdin.read()
     meta = _meta(prompt)
@@ -110,7 +119,13 @@ def main() -> int:
 
     start = time.time()
     _log({"event": "start", "provider": flavor, "purpose": purpose, "task": task, "t": start, "cwd": str(cwd),
-          "pid": os.getpid()})
+          "pid": os.getpid(), "leaked_env": leaked, "argv": argv})
+    if flavor == "claude":
+        # like the real CLI, the init event (with its auth source) comes first
+        print(json.dumps({"type": "system", "subtype": "init", "model": "fake", "cwd": str(cwd),
+                          "apiKeySource": os.environ.get("ORCH_FAKE_API_KEY_SOURCE", "none")}), flush=True)
+        if os.environ.get("ORCH_FAKE_API_KEY_SOURCE", "none") != "none":
+            time.sleep(30)   # a compliant orchestrator kills us here
     exit_code = 0
     structured = None
     text = "done"
@@ -140,7 +155,6 @@ def main() -> int:
           "exit_code": exit_code, "files": snapshot})
 
     if flavor == "claude":
-        print(json.dumps({"type": "system", "subtype": "init", "model": "fake", "cwd": str(cwd)}))
         print(json.dumps({"type": "assistant", "message": {"content": [{"type": "text", "text": text[:200]}]}}))
         res = {"type": "result", "subtype": "success" if exit_code == 0 else "error_during_execution",
                "is_error": exit_code != 0, "result": text, "total_cost_usd": 0.01, "num_turns": 1,

@@ -125,7 +125,8 @@ def cmd_status(orch: Orchestrator, args) -> int:
     print(f"repo:         {run['repo_path']}")
     print(f"integration:  {run['integration_branch']}  (base {run['base_ref']} @ {(run['base_commit'] or '')[:10]})")
     print(f"progress:     {done}/{len(tasks)} tasks completed, repair round {run['repair_round']}")
-    print(f"cost:         ${orch.store.total_cost(run_id):.4f} (reported by CLIs)")
+    print(f"usage:        ${orch.store.total_cost(run_id):.4f} API-equivalent estimate "
+          f"(subscription usage, not billed)")
     if run["error"]:
         print(f"problem:      {run['error']}")
     if tasks:

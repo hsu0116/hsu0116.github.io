@@ -137,8 +137,12 @@ def pid_alive(pid: int | None) -> bool:
         return True
 
 
-def child_env(extra: dict[str, str] | None = None) -> dict[str, str]:
+def child_env(extra: dict[str, str] | None = None, remove: tuple[str, ...] | list[str] = ()) -> dict[str, str]:
     env = dict(os.environ)
+    blocked = {r.upper() for r in remove}
+    for k in list(env):
+        if k.upper() in blocked:   # case-insensitive: Windows env names are case-insensitive
+            del env[k]
     env.setdefault("PYTHONIOENCODING", "utf-8")
     env["NO_COLOR"] = "1"
     # Never let a child inherit an interactive git credential prompt.

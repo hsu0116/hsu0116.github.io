@@ -14,11 +14,13 @@ import subprocess
 
 from ..models import AgentResult
 from ..procutil import CommandNotFound, child_env, resolve_command
+from ..subscription import ALL_BLOCKED_ENV, check_claude_auth_status, claude_init_violation
 from .base import PLAN, REVIEW, AgentAdapter, Invocation, extract_json
 
 
 class ClaudeAdapter(AgentAdapter):
     name = "claude"
+    blocked_env = ALL_BLOCKED_ENV
 
     def base_argv(self) -> list[str]:
         if self._base_argv is None:
@@ -30,14 +32,21 @@ class ClaudeAdapter(AgentAdapter):
             argv = self.base_argv()
         except CommandNotFound as e:
             return False, str(e)
+        env = child_env(remove=self.blocked_env)
         try:
             r = subprocess.run(argv + ["--version"], capture_output=True, text=True, timeout=60,
-                               env=child_env(), check=False)
+                               env=env, check=False)
+            if r.returncode != 0:
+                return False, (r.stderr or r.stdout).strip()[:300]
+            st = subprocess.run(argv + ["auth", "status", "--json"], capture_output=True, text=True,
+                                timeout=60, env=env, check=False)
         except (OSError, subprocess.TimeoutExpired) as e:
             return False, f"cannot execute claude: {e}"
-        if r.returncode != 0:
-            return False, (r.stderr or r.stdout).strip()[:300]
-        return True, r.stdout.strip()
+        ok, msg = check_claude_auth_status(st.stdout)
+        return ok, f"{r.stdout.strip()} - {msg}"
+
+    def guard_line(self, line: str) -> str | None:
+        return claude_init_violation(line)
 
     def build(self, *, purpose: str, prompt: str, cwd: str, artifacts_dir: str,
               model: str | None = None, schema: dict | None = None) -> Invocation:
@@ -70,7 +79,7 @@ class ClaudeAdapter(AgentAdapter):
             argv += ["--json-schema", json.dumps(schema, separators=(",", ":"))]
         argv += list(cfg.get("extra_args") or [])
         return Invocation(provider=self.name, purpose=purpose, argv=argv, cwd=cwd, stdin_text=prompt,
-                          model=m, artifacts_dir=artifacts_dir)
+                          model=m, artifacts_dir=artifacts_dir, env_remove=self.blocked_env)
 
     @staticmethod
     def log_line(line: str) -> str | None:

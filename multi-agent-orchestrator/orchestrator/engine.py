@@ -51,6 +51,7 @@ class Orchestrator:
         self.task_cancel: dict[str, asyncio.Event] = {}
         self.integ_lock = asyncio.Lock()
         self.budget_exceeded = False
+        self.policy_violation: str | None = None
 
     # ================================================================ public API
     def create_run(self, request: str, repo: str | Path, base_ref: str | None = None) -> str:
@@ -92,11 +93,13 @@ class Orchestrator:
         self.stop_event = asyncio.Event()
         self.task_cancel = {}
         self.budget_exceeded = False
+        self.policy_violation = None
         self.wt = WorktreeManager(run["repo_path"], self.data_dir / "worktrees", self.config)
         self.run_dir = self.data_dir / "runs" / run_id
         (self.run_dir / "artifacts").mkdir(parents=True, exist_ok=True)
         self.runner = AgentRunner(self.store, self.redact, self.run_dir / "logs",
-                                  self.config["logging"].get("save_agent_output", True))
+                                  self.config["logging"].get("save_agent_output", True),
+                                  on_policy_violation=self._on_policy_violation)
         watcher = asyncio.create_task(self._watch_control(run_id))
         try:
             self._setup_integration(run)
@@ -195,6 +198,14 @@ class Orchestrator:
             except Exception:  # pragma: no cover - keep watching
                 pass
             await asyncio.sleep(0.5)
+
+    def _on_policy_violation(self, msg: str) -> None:
+        """An agent tried to run on API billing: stop everything immediately."""
+        if self.policy_violation is None:
+            self.policy_violation = msg
+            self.store.update_run(self.run_id, error=msg, stop_requested=1)
+            self._event(f"{msg} - stopping all agents", "error")
+        self.stop_event.set()
 
     def _budget_ok(self) -> bool:
         limit = self.config["limits"].get("max_total_cost_usd")
@@ -678,6 +689,8 @@ class Orchestrator:
 
     # ---------------------------------------------------------------- finish
     def _finish(self, status: RunStatus) -> str:
+        if self.policy_violation:
+            status = RunStatus.FAILED
         run = self._run(self.run_id)
         # main / base branch must never move because of the orchestrator
         if run["base_ref"] and run["base_ref"] != "HEAD":

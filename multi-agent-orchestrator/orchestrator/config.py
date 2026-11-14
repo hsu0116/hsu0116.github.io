@@ -27,6 +27,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
             "model": None,
             "reviewer_model": None,
             "planner_model": None,
+            # Usage cap per call, measured in the CLI's API-equivalent estimate (subscription logins
+            # are not billed per call; this only limits how much of your plan's usage one call may take).
             "max_budget_usd_per_call": 5.0,
             # Built-in tools exposed to workers (--tools); everything else is removed.
             "worker_tools": ["Read", "Write", "Edit", "Glob", "Grep", "Bash"],
@@ -68,7 +70,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "review_timeout_seconds": 900,
         "test_timeout_seconds": 900,
         "max_tasks": 8,
-        "max_total_cost_usd": None,      # stop scheduling new agents once exceeded (if known)
+        "max_total_cost_usd": None,      # usage cap (API-equivalent estimate) for the whole run
         "max_diff_chars_for_review": 60000,
     },
     "integration": {

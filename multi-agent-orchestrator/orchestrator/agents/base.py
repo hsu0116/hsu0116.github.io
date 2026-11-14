@@ -27,6 +27,7 @@ class Invocation:
     model: str | None = None
     artifacts_dir: str = ""
     extra: dict[str, Any] = field(default_factory=dict)
+    env_remove: tuple[str, ...] = ()       # environment variables never passed to the agent
 
 
 class AgentAdapter:
@@ -44,8 +45,14 @@ class AgentAdapter:
     def parse(self, inv: Invocation, exit_code: int | None, stdout: str, stderr: str) -> AgentResult:
         raise NotImplementedError
 
+    blocked_env: tuple[str, ...] = ()
+
     def availability(self) -> tuple[bool, str]:
         return True, "ok"
+
+    def guard_line(self, line: str) -> str | None:
+        """Inspect one stdout line while the agent runs; a returned message aborts the run."""
+        return None
 
     # -- helpers ------------------------------------------------------------
     def model_for(self, purpose: str, override: str | None) -> str | None:

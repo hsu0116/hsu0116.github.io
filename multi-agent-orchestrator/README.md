@@ -6,6 +6,9 @@ cherry-pick 하고, **통합 테스트 + Claude↔Codex 교차 리뷰 + 자동 �
 CLI 오케스트레이터입니다.
 
 > main 브랜치는 절대 자동으로 변경되지 않으며, push도 하지 않습니다. 최종 병합은 사용자가 직접 합니다.
+>
+> **API 과금은 절대 사용하지 않습니다.** 에이전트는 Claude Pro/Max 로그인과 ChatGPT 로그인(구독 사용량)으로만
+> 실행되며, 이 정책은 설정으로 끌 수 없습니다. (아래 "요금: 구독 전용" 참고)
 
 ```
 사용자 요청 ─▶ Planner(claude -p, 읽기 전용, JSON 스키마) ─▶ 계획 검증(ID·범위·DAG 순환 검사)
@@ -54,6 +57,22 @@ orchestrator doctor
 `doctor`는 Python/Git/worktree/node/claude/codex 설치 여부와 Codex 로그인 상태(`codex login status`)를 확인합니다.
 
 macOS / Linux 도 동일하게 동작합니다 (`python3 -m venv .venv && . .venv/bin/activate`).
+
+## 1-1. 요금: 구독 전용 (API 사용 금지)
+
+| 단계 | Claude Code | Codex |
+|---|---|---|
+| ① 환경변수 제거 | 모든 에이전트·테스트 프로세스에서 `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, Bedrock/Vertex/Foundry 설정 제거 | `OPENAI_API_KEY`, `CODEX_API_KEY`, `AZURE_OPENAI_API_KEY` 제거 (두 제공자 키 모두 모든 프로세스에서 제거) |
+| ② 실행 전 로그인 확인 | `claude auth status --json` 의 `authMethod` 가 `claude.ai`(Pro/Max 로그인) 또는 `oauth_token`(`claude setup-token` 구독 토큰)일 때만 사용. `api_key`, `api_key_helper`, `third_party` 는 거부 | `codex login status` 가 `Logged in using ChatGPT` 일 때만 사용 |
+| ③ 실행 중 강제 | `--restricted` 로 사용자 설정 파일의 `apiKeyHelper` 무시 | 모든 호출에 `-c forced_login_method="chatgpt"` (Codex가 API 키 인증 자체를 거부) |
+| ④ 실시간 감시 | 모든 `claude -p` 호출의 첫 `init` 이벤트에서 `apiKeySource` 가 `"none"` 이 아니면 즉시 프로세스 트리 종료 → 전체 실행 중단, 상태 `FAILED`, 그 작업 결과는 통합하지 않음 | – |
+
+- 한 제공자가 구독 로그인이 아니면 그 작업은 다른 구독 제공자에게 넘어가고, 둘 다 아니면 에이전트를 하나도 실행하지 않고 `FAILED`.
+- 보고서/`status` 의 금액은 **청구액이 아니라 CLI가 계산한 API 환산 추정치**(구독 사용량 지표)입니다.
+  `max_budget_usd_per_call`, `limits.max_total_cost_usd` 도 이 추정치 기준의 "사용량 상한"입니다.
+- Pro 사용량 한도에 걸리면 해당 에이전트가 실패로 기록됩니다. 한도가 풀린 뒤 `orchestrator resume --retry-failed`.
+  한도를 아끼려면 `limits.max_parallel_workers: 2`, `providers.claude.model: claude-sonnet-5-5` 처럼 줄이세요.
+- `orchestrator doctor` 가 현재 로그인 방식을 보여줍니다 (예: `subscription login (claude.ai, plan pro)`).
 
 ## 2. 사용법
 
@@ -191,6 +210,7 @@ multi-agent-orchestrator/
 │   ├── result_validator.py    # 결과 검증
 │   ├── test_runner.py         # 테스트 실행
 │   ├── state_store.py         # SQLite
+│   ├── subscription.py        # 구독 전용 정책 (API 키 차단)
 │   ├── report.py / doctor.py / security.py / procutil.py / config.py / models.py
 │   ├── agents/                # claude_adapter.py, codex_adapter.py, fake_agent.py(테스트용 CLI 대역)
 │   └── prompts/               # planner.md, worker.md, reviewer.md, repair.md
@@ -214,7 +234,9 @@ worktree, cherry-pick, 상태 저장이 모두 실제 코드 경로로 검증됩
 
 | 증상 | 해결 |
 |---|---|
-| `doctor`에서 codex `not authenticated` | `codex login` 실행. 그동안은 codex 작업이 claude로 재배정됨(`fallback_on_unavailable`) |
+| `doctor`에서 claude `... is not a Claude subscription login; API billing is not allowed` | API 키 로그인 상태임. `claude auth logout` 후 `claude auth login` 으로 Pro 계정 로그인, `ANTHROPIC_API_KEY` 환경변수 삭제 (PowerShell: `[Environment]::SetEnvironmentVariable("ANTHROPIC_API_KEY", $null, "User")`) |
+| `doctor`에서 codex `not logged in` / `not a ChatGPT subscription login` | `codex logout` 후 `codex login` → "Sign in with ChatGPT" 선택. 그동안은 codex 작업이 claude로 재배정됨 |
+| `SUBSCRIPTION POLICY VIOLATION` 로 실행 실패 | 관리형 설정(managed settings) 등으로 CLI가 API 키를 쓰려 함. 위 두 항목대로 로그인을 정리한 뒤 `resume --retry-failed` |
 | `... is a batch shim that could not be resolved` | `providers.codex.command: ["node", "C:/Users/<you>/AppData/Roaming/npm/node_modules/@openai/codex/bin/codex.js"]` 처럼 지정 |
 | `Filename too long` (Windows) | `git config --global core.longpaths true`, `storage.data_dir` 를 `C:/orch-data` 같이 짧은 경로로 |
 | 작업이 `FAILED: changes outside the allowed scope` | planner가 정한 `files` 범위를 확인. 필요하면 `--plan-file` 로 범위를 수정하거나 `scope_violation: warn` |
@@ -228,5 +250,6 @@ worktree, cherry-pick, 상태 저장이 모두 실제 코드 경로로 검증됩
 
 - 웹 대시보드(4단계)는 미구현. 엔진은 UI와 분리되어 있고 모든 상태가 SQLite에 있으므로 읽기 전용 대시보드를 바로 붙일 수 있습니다.
 - Codex 실제 호출은 이 저장소 개발 환경에서 인증/네트워크가 없어 검증하지 못했습니다(인자 호환성은 codex-cli 0.169.0 실물로 확인).
-- 비용: Claude는 CLI가 보고하는 USD 비용, Codex는 토큰 사용량만 기록합니다.
+- 사용량: Claude는 CLI가 보고하는 API 환산 추정치(청구 아님), Codex는 토큰 수만 기록합니다.
+- ④ 실시간 감시는 최후 방어선입니다. 실제 차단은 ①~③(키 제거·로그인 확인·강제 옵션)이 담당합니다.
 - 충돌은 자동 해결하지 않고, 해당 작업을 최신 통합 결과 위에서 재실행하는 방식으로만 처리합니다.

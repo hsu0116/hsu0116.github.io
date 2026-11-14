@@ -33,8 +33,8 @@ def build_report(store: StateStore, run_id: str) -> str:
     a(f"- **Repair rounds used:** {run['repair_round']}")
     a(f"- **Created / finished:** {run['created_at']} / {run['finished_at'] or '-'}")
     total = sum((r["cost_usd"] or 0) for r in agent_runs)
-    a(f"- **Agent invocations:** {len(agent_runs)}, reported cost {_fmt_cost(total)} "
-      f"(codex reports tokens only; see usage)")
+    a(f"- **Agent invocations:** {len(agent_runs)}, usage {_fmt_cost(total)} as an API-equivalent estimate "
+      f"(subscription logins only - nothing is billed to an API key; codex reports tokens only)")
     if run["error"]:
         a(f"- **Problem:** {run['error']}")
     a("")
@@ -94,7 +94,7 @@ def build_report(store: StateStore, run_id: str) -> str:
     a("")
     a("## Agent invocations")
     a("")
-    a("| # | Task | Purpose | Provider | Exit | Timeout | Cancelled | Cost | Log |")
+    a("| # | Task | Purpose | Provider | Exit | Timeout | Cancelled | Usage (API-eq. est.) | Log |")
     a("|---|---|---|---|---|---|---|---|---|")
     for r in agent_runs:
         a(f"| {r['id']} | {r['task_id'] or '-'} | {r['purpose']} | {r['provider']} | {r['exit_code']} | "

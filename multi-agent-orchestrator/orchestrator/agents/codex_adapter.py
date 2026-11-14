@@ -14,11 +14,13 @@ from pathlib import Path
 
 from ..models import AgentResult
 from ..procutil import CommandNotFound, child_env, resolve_command
+from ..subscription import ALL_BLOCKED_ENV, CODEX_FORCED_LOGIN_ARGS, check_codex_login_status
 from .base import PLAN, REVIEW, AgentAdapter, Invocation, extract_json
 
 
 class CodexAdapter(AgentAdapter):
     name = "codex"
+    blocked_env = ALL_BLOCKED_ENV
 
     def base_argv(self) -> list[str]:
         if self._base_argv is None:
@@ -31,18 +33,19 @@ class CodexAdapter(AgentAdapter):
         except CommandNotFound as e:
             return False, str(e)
         try:
+            env = child_env(remove=self.blocked_env)
             ver = subprocess.run(argv + ["--version"], capture_output=True, text=True, timeout=60,
-                                 env=child_env(), check=False)
+                                 env=env, check=False)
             if ver.returncode != 0:
                 return False, (ver.stderr or ver.stdout).strip()[:300]
-            st = subprocess.run(argv + ["login", "status"], capture_output=True, text=True, timeout=60,
-                                env=child_env(), check=False)
+            st = subprocess.run(argv + CODEX_FORCED_LOGIN_ARGS + ["login", "status"], capture_output=True,
+                                text=True, timeout=60, env=env, check=False)
         except (OSError, subprocess.TimeoutExpired) as e:
             return False, f"cannot execute codex: {e}"
-        status_text = (st.stdout + st.stderr).strip()
-        if st.returncode != 0 or "not logged in" in status_text.lower():
-            return False, f"{ver.stdout.strip()} - not authenticated ({status_text[:200]}); run 'codex login'"
-        return True, f"{ver.stdout.strip()} - {status_text[:120]}"
+        ok, msg = check_codex_login_status(st.stdout + st.stderr)
+        if st.returncode != 0 and ok:
+            ok, msg = False, f"'codex login status' failed: {(st.stdout + st.stderr).strip()[:200]}"
+        return ok, f"{ver.stdout.strip()} - {msg}"
 
     def build(self, *, purpose: str, prompt: str, cwd: str, artifacts_dir: str,
               model: str | None = None, schema: dict | None = None) -> Invocation:
@@ -60,6 +63,7 @@ class CodexAdapter(AgentAdapter):
             "--cd", cwd,
             "--ephemeral",
             "-c", 'approval_policy="never"',
+            *CODEX_FORCED_LOGIN_ARGS,          # subscription (ChatGPT) login only, never an API key
             "-o", str(last_msg),
         ]
         m = self.model_for(purpose, model)
@@ -70,7 +74,8 @@ class CodexAdapter(AgentAdapter):
         argv += list(cfg.get("extra_args") or [])
         argv.append("-")  # read prompt from stdin
         return Invocation(provider=self.name, purpose=purpose, argv=argv, cwd=cwd, stdin_text=prompt,
-                          model=m, artifacts_dir=artifacts_dir, extra={"last_message": str(last_msg)})
+                          model=m, artifacts_dir=artifacts_dir, extra={"last_message": str(last_msg)},
+                          env_remove=self.blocked_env)
 
     @staticmethod
     def log_line(line: str) -> str | None:
