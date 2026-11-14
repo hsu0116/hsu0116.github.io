@@ -488,3 +488,22 @@ def test_resume_after_stop_on_last_attempt_does_not_loop(h, repo):
     assert asyncio.run(scenario()) == "STOPPED"
     assert asyncio.run(asyncio.wait_for(orch.resume(run_id), timeout=60)) == "SUCCEEDED"
     assert orch.store.get_task(run_id, "t1")["attempts"] == 1
+
+
+def test_retry_failed_after_exhausted_repairs_creates_new_repair_tasks(h, repo):
+    """Regression: resume --retry-failed restarts round counting; repair task ids must not collide."""
+    h.scenario({
+        "plan": plan({"id": "t1", "provider": "codex", "files": ["calc.py"]}),
+        "tasks": {"t1": {"write": {"calc.py": "def add(a, b):\n    return a - b\n"}},
+                  "repair-r1": {"write": {"calc.py": "def add(a, b):\n    return a * b\n"}},
+                  "repair-r2": {"write": {"calc.py": "def add(a, b):\n    return a * 1 * b\n"}},
+                  "repair-r1-2": {"write": {"calc.py": CALC}}},
+    })
+    orch = h.orchestrator(limits={"max_repair_rounds": 2})
+    run_id, status = h.run(orch, repo)
+    assert status == "NEEDS_ATTENTION"
+    status = asyncio.run(orch.resume(run_id, retry_failed=True))
+    assert status == "SUCCEEDED", orch.store.list_events(run_id)[-10:]
+    ids = [t["id"] for t in orch.store.list_tasks(run_id)]
+    assert ids == ["t1", "repair-r1", "repair-r2", "repair-r1-2"]
+    assert len(set(ids)) == len(ids)

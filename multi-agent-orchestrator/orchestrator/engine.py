@@ -601,7 +601,11 @@ class Orchestrator:
             findings_text += (f"- [{f.severity}] ({reviewer}) {f.file}"
                               f"{(':' + str(f.line)) if f.line else ''} - {f.title}. Fix: {f.recommendation}\n")
         provider = self._choose_repair_provider(files)
-        tid = f"repair-r{round_no}"
+        # ids must stay unique: a resumed run (--retry-failed) starts counting rounds again
+        existing = {t["id"] for t in self.store.list_tasks(self.run_id)}
+        tid, n = f"repair-r{round_no}", 2
+        while tid in existing:
+            tid, n = f"repair-r{round_no}-{n}", n + 1
         desc = ("Fix the problems found while verifying the integrated result of all tasks."
                 + render("repair.md", round=round_no, test_failures=failure_text or "(tests passed)",
                          findings=findings_text or "(none)"))
