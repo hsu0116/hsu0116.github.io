@@ -71,6 +71,7 @@ def main():
     ap.add_argument("--start", default="20150101")
     ap.add_argument("--end", default="20261113")
     ap.add_argument("--path", default="")
+    ap.add_argument("--meta", default=None, help="csv 소스용 종목정보(code,name,market)")
     ap.add_argument("--split", default="2022-01-01", help="이 날짜 이전=IS(개발), 이후=OOS(검증)")
     ap.add_argument("--thr", type=float, default=15.0)
     ap.add_argument("--min_value", type=float, default=1e9, help="급등일 거래대금 하한(원)")
@@ -88,7 +89,7 @@ def main():
         panel = data.load_naver(a.start, a.end)
         data.save_panel(panel, out / "panel.pkl")
     elif a.source == "csv":
-        panel = data.load_csv_dir(a.path)
+        panel = data.load_csv_dir(a.path, a.meta)
     elif a.source == "pickle":
         panel = data.load_panel(a.path)
     else:

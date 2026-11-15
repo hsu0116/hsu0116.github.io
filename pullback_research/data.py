@@ -136,6 +136,8 @@ def load_naver(start: str, end: str, cache_dir: str = "cache_naver", sleep: floa
 def load_csv_dir(path: str, meta_csv: str | None = None) -> dict:
     data = {}
     for fp in Path(path).glob("*.csv*"):
+        if fp.name.startswith("_"):
+            continue
         code = fp.name.split(".")[0]
         df = pd.read_csv(fp, index_col=0, parse_dates=True)
         df.columns = [c.lower() for c in df.columns]
@@ -147,7 +149,7 @@ def load_csv_dir(path: str, meta_csv: str | None = None) -> dict:
     prev = panel["close"].ffill().shift(1)
     panel["chg"] = (panel["close"] / prev - 1) * 100
     if meta_csv:
-        panel["meta"] = pd.read_csv(meta_csv, dtype={"code": str}).set_index("code")
+        panel["meta"] = pd.read_csv(meta_csv, dtype={"code": str}).set_index("code")[["name", "market"]]
     else:
         panel["meta"] = pd.DataFrame({"name": list(data), "market": "UNKNOWN"}, index=list(data))
     return _finish(panel)

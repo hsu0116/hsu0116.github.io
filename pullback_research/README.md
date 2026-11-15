@@ -30,3 +30,15 @@ KRX_ID=아이디 KRX_PW=비번 python run_research.py --source krx --start 20150
 # 네이버 (현재 상장 종목만 = 생존편향 있음 → 결과가 낙관적)
 python run_research.py --source naver --start 2015-01-01 --end 2026-11-13
 ```
+
+### 키움 REST API로 실행 (본인 PC)
+1. openapi.kiwoom.com 에서 REST API 신청 → 앱키/시크릿키 발급, 실행할 PC의 공인 IP를 허용 IP로 등록
+2. 키를 환경변수로 설정 (PowerShell: `$env:KIWOOM_APPKEY="..."; $env:KIWOOM_SECRETKEY="..."`)
+3. 실행
+```bash
+pip install requests pandas numpy matplotlib
+python kiwoom_fetch.py --start 20150101 --out kiwoom_csv --limit 5 --debug   # 시험
+python kiwoom_fetch.py --start 20150101 --out kiwoom_csv                      # 전종목 (1시간 내외)
+python run_research.py --source csv --path kiwoom_csv --meta kiwoom_csv/_meta.csv
+```
+키움도 현재 상장 종목만 제공 → 생존편향 있음.
