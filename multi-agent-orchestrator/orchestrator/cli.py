@@ -224,6 +224,60 @@ def cmd_report(orch: Orchestrator, args) -> int:
     return 0
 
 
+def _usage_rows(orch: Orchestrator, run_id: str | None) -> list[dict]:
+    if run_id:
+        return orch.store.list_agent_runs(run_id)
+    return [dict(r) for r in orch.store._query("SELECT * FROM agent_runs ORDER BY id")]
+
+
+def cmd_usage(orch: Orchestrator, args) -> int:
+    """Token usage per provider and a check that only subscription logins are used."""
+    from .agents import PROVIDERS
+    rows = _usage_rows(orch, args.run_id)
+    scope = f"run {args.run_id}" if args.run_id else f"all runs ({len(orch.store.list_runs(100000))})"
+    print(f"== Agent usage: {scope}\n")
+    stats: dict[str, dict] = {}
+    violations = 0
+    for r in rows:
+        st = stats.setdefault(r["provider"], {"calls": 0, "failed": 0, "cost": 0.0, "tokens": {}})
+        st["calls"] += 1
+        if r["exit_code"] not in (0,) or r["error"]:
+            st["failed"] += 1
+        st["cost"] += r["cost_usd"] or 0.0
+        if r["error"] and "SUBSCRIPTION POLICY VIOLATION" in r["error"]:
+            violations += 1
+        try:
+            usage = json.loads(r["usage_json"]) if r["usage_json"] else {}
+        except (json.JSONDecodeError, TypeError):
+            usage = {}
+        for k, v in usage.items():
+            if isinstance(v, (int, float)) and not isinstance(v, bool) and "token" in k:
+                st["tokens"][k] = st["tokens"].get(k, 0) + v
+    if not stats:
+        print("no agent calls recorded")
+    for prov, st in stats.items():
+        t = st["tokens"]
+        total = sum(t.values())
+        print(f"[{prov}] calls={st['calls']} (failed/cancelled {st['failed']})")
+        for k in sorted(t):
+            print(f"    {k:<32} {int(t[k]):>15,}")
+        print(f"    {'total tokens':<32} {int(total):>15,}")
+        if prov == "claude":
+            print(f"    API-equivalent estimate          ${st['cost']:,.2f}  (NOT billed: subscription login)")
+        else:
+            print("    API-equivalent estimate          n/a (codex reports tokens only; NOT billed: ChatGPT login)")
+        print()
+    print("== Billing safety check")
+    for p in PROVIDERS:
+        ok, msg = orch.available(p)
+        print(f"  {p:<7} {'OK  ' if ok else 'WARN'} {msg}")
+    print(f"  subscription policy violations recorded: {violations}")
+    print("\nThe orchestrator strips API keys and refuses API-key logins, so agent calls use only your")
+    print("Claude / ChatGPT subscription usage. Plan limits and any optional paid extras are shown on the")
+    print("providers' own settings pages (see README).")
+    return 0 if violations == 0 else 3
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="orchestrator",
                                 description="Claude Code x Codex multi-agent orchestrator (git worktree based)")
@@ -284,6 +338,10 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("run_id", nargs="?")
     s.add_argument("--write", action="store_true", help="also write report.md")
     s.set_defaults(func=cmd_report)
+
+    s = sub.add_parser("usage", help="token usage per provider and subscription-only billing check")
+    s.add_argument("run_id", nargs="?", help="limit to one run (default: all runs)")
+    s.set_defaults(func=cmd_usage)
     return p
 
 

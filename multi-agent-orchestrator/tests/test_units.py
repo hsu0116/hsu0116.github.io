@@ -295,3 +295,9 @@ def test_cli_status_plan_logs_report_on_completed_run(h, repo, capsys, tmp_path)
     out = capsys.readouterr().out
     assert "1/1 tasks completed" in out and "# Orchestrator report" in out and "[codex/general]" in out
     assert cli_main(["--config", str(cfg_path), "status", "nope"]) == 1
+    capsys.readouterr()
+    assert cli_main(["--config", str(cfg_path), "usage"]) == 0
+    out = capsys.readouterr().out
+    assert "[claude] calls=" in out and "[codex] calls=" in out and "total tokens" in out
+    assert "subscription policy violations recorded: 0" in out
+    assert "input_tokens" in out

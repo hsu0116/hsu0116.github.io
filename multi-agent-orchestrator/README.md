@@ -73,6 +73,11 @@ macOS / Linux 도 동일하게 동작합니다 (`python3 -m venv .venv && . .ven
 - Pro 사용량 한도에 걸리면 해당 에이전트가 실패로 기록됩니다. 한도가 풀린 뒤 `orchestrator resume --retry-failed`.
   한도를 아끼려면 `limits.max_parallel_workers: 2`, `providers.claude.model: claude-sonnet-5-5` 처럼 줄이세요.
 - `orchestrator doctor` 가 현재 로그인 방식을 보여줍니다 (예: `subscription login (claude.ai, plan pro)`).
+- `orchestrator usage [RUN_ID]` 는 제공자별 호출 수·토큰 수(입력/출력/캐시)와 API 환산 추정치, 현재 로그인 방식,
+  정책 위반 기록 수를 보여줍니다.
+- 실제 청구 여부는 각 회사 화면에서 확인하세요: Claude는 claude.ai **설정 → 사용량/결제**(추가 사용량 같은 유료 옵션이
+  있다면 꺼져 있는지), ChatGPT는 **설정 → 플랜/결제**(Codex 추가 크레딧 구매·자동 충전이 꺼져 있는지),
+  API 콘솔(console.anthropic.com, platform.openai.com)은 계정이 있다면 사용액이 $0 인지.
 
 ## 2. 사용법
 
