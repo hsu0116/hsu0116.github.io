@@ -74,6 +74,7 @@ def main():
     ap.add_argument("--meta", default=None, help="csv 소스용 종목정보(code,name,market)")
     ap.add_argument("--split", default="2022-01-01", help="이 날짜 이전=IS(개발), 이후=OOS(검증)")
     ap.add_argument("--thr", type=float, default=15.0)
+    ap.add_argument("--max_chg", type=float, default=1e9, help="예: 29.5 -> 상한가 마감 종목 제외")
     ap.add_argument("--min_value", type=float, default=1e9, help="급등일 거래대금 하한(원)")
     ap.add_argument("--cost", type=float, default=0.003, help="왕복 비용(세금+수수료+슬리피지)")
     ap.add_argument("--min_n", type=int, default=200)
@@ -96,7 +97,7 @@ def main():
         panel = data.make_synthetic(2500, 1500)
         a.min_value, a.split = 0, "2020-01-01"
 
-    ev = en.find_events(panel, thr=a.thr, min_value=a.min_value)
+    ev = en.find_events(panel, thr=a.thr, min_value=a.min_value, max_chg=a.max_chg)
     print(f"이벤트 {len(ev):,}건 ({ev.date.min().date()} ~ {ev.date.max().date()})")
     ev.to_csv(out / "events.csv", index=False, encoding="utf-8-sig")
     w = en.build_windows(panel, ev)
@@ -144,7 +145,18 @@ def main():
     pf.to_csv(out / "portfolio_oos.csv", index=False, encoding="utf-8-sig")
     print("\n=== OOS 포트폴리오 (동시보유 5/10종목) ===")
     print(pf.round(4).to_string(index=False))
-    pd.concat(seg_all).to_csv(out / "segments_top.csv", index=False, encoding="utf-8-sig")
+    seg = pd.concat(seg_all)
+    seg.to_csv(out / "segments_top.csv", index=False, encoding="utf-8-sig")
+
+    # 기준선(D종가/D+1시가)과 상위 후보의 등락률 구간별 성과 (상한가 쏠림 확인용)
+    print("\n=== 등락률 구간별 성과 (전체기간, IS 최적청산 기준) ===")
+    show = [n for n in ("BASE_D종가", "BASE_D+1시가") if n in emap] + list(top.entry.head(4))
+    for name in dict.fromkeys(show):
+        r = ok[ok.entry == name].sort_values("IS_mean").iloc[-1]
+        st = segment_table(w, emap[name], r.tp, r.sl, int(r.H), a.cost)
+        st = st[st["구분"].isin(["등락률구간", "직전20일급등"])]
+        print(f"\n[{name}] tp={r.tp} sl={r.sl} H={int(r.H)}")
+        print(st[["구분", "값", "n", "평균", "중앙", "승률"]].round(4).to_string(index=False))
 
     try:
         import matplotlib

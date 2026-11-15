@@ -34,12 +34,14 @@ INF = np.inf
 
 # =========================================================================== events
 def find_events(panel: dict, thr: float = 15.0, min_value: float = 1e9, min_price: float = 1000,
-                exclude_pref: bool = True, exclude_spac: bool = True, upper_only: bool = False) -> pd.DataFrame:
+                exclude_pref: bool = True, exclude_spac: bool = True, upper_only: bool = False,
+                max_chg: float = 1e9) -> pd.DataFrame:
     chg, val, cls = panel["chg"], panel["value"], panel["close"]
     meta = panel["meta"]
     m = (chg >= thr) & (val >= min_value) & (cls >= min_price)
     if upper_only:
         m &= chg >= 29.5
+    m &= chg < max_chg
     cols = cls.columns
     ok = pd.Series(True, index=cols)
     if exclude_pref:  # 우선주: 코드 끝자리 0 아님 (구형 코드 기준)
@@ -341,7 +343,7 @@ def run_grid(w: Win, entries: list[Entry], split_date: str, cost: float = 0.003,
 
 
 # =========================================================================== portfolio
-def portfolio(w: Win, en: Entry, tp, sl, H, cost, slots: int = 10, start=None, end=None):
+def portfolio(w: Win, en: Entry, tp, sl, H, cost, slots: int = 10, start=None, end=None, seed: int = 0):
     """동시 최대 slots 종목, 진입 시 (실현 자산/slots) 투입. 실현 기준 자산곡선."""
     ret, hold, xcol, valid = simulate(w, en, tp, sl, H, cost)
     t_in = w.t0 + (en.col - PRE)
@@ -353,8 +355,9 @@ def portfolio(w: Win, en: Entry, tp, sl, H, cost, slots: int = 10, start=None, e
         df = df[d[df.t_in.values] >= pd.Timestamp(start)]
     if end:
         df = df[d[df.t_in.values] < pd.Timestamp(end)]
-    # 같은 날 신호 여럿이면 등락률 큰 순서 우선 (결정론적)
-    df = df.sort_values(["t_in", "chg"], ascending=[True, False])
+    # 같은 날 신호 여럿이면 무작위 순서 (등락률 큰 순 우선은 상한가 쏠림 왜곡을 만든다)
+    df["rnd"] = np.random.default_rng(seed).random(len(df))
+    df = df.sort_values(["t_in", "rnd"])
     eq = 1.0
     active = []  # (t_out, size, ret)
     curve = []
