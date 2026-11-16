@@ -21,6 +21,7 @@ import pandas as pd
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import data  # noqa: E402
 import engine as en  # noqa: E402
+import ytrules as yt  # noqa: E402
 
 pd.set_option("display.width", 250)
 pd.set_option("display.max_columns", 30)
@@ -107,56 +108,101 @@ def main():
     print(es.round(4).to_string(index=False))
 
     entries = en.make_entries(w)
-    g = en.run_grid(w, entries, a.split, cost=a.cost)
+    print("지표 계산 중...")
+    G = yt.compute_panels(panel)
+    X = {k: yt.gather(G[k], ev, w.K) for k in ("ma5", "ma10", "ma20", "sd20", "rsi", "slowk", "slowd", "osc")}
+    entries += yt.make_yt_entries(w, X)
+    xa = yt.exit_arrays_factory(w, X)
+    exits = en.basic_exits() + yt.struct_exits()
+    print(f"진입규칙 {len(entries)}개 × 청산 {len(exits)}개 백테스트 중... (수십 분 걸릴 수 있음)")
+    g = en.run_grid(w, entries, a.split, cost=a.cost, exits=exits, exit_arrays=xa)
     g.to_csv(out / "grid_all.csv", index=False, encoding="utf-8-sig")
     print(f"조합 {len(g):,}개 테스트")
 
     ok = g[(g.IS_n >= a.min_n) & (g.OOS_n >= a.min_n // 3)].copy()
+    cols = ["entry", "tp", "sl", "H", "xs", "IS_n", "IS_fill", "IS_mean", "IS_win", "IS_t", "IS_per_event",
+            "OOS_n", "OOS_mean", "OOS_win", "OOS_t", "OOS_per_event", "OOS_hold"]
+    short = ["entry", "tp", "sl", "H", "xs", "IS_n", "IS_mean", "IS_t", "OOS_n", "OOS_mean", "OOS_win", "OOS_t"]
     # 진입 규칙별 IS 최적 청산 -> OOS 성과
     best_exit = ok.loc[ok.groupby("entry")["IS_mean"].idxmax()].sort_values("IS_mean", ascending=False)
-    cols = ["entry", "tp", "sl", "H", "IS_n", "IS_fill", "IS_mean", "IS_win", "IS_t", "IS_per_event",
-            "OOS_n", "OOS_mean", "OOS_win", "OOS_t", "OOS_per_event", "OOS_hold"]
     best_exit[cols].to_csv(out / "best_by_entry.csv", index=False, encoding="utf-8-sig")
     print("\n=== 진입규칙별 IS 최적청산 → OOS (상위 25) ===")
-    print(best_exit[cols].head(25).round(4).to_string(index=False))
+    print(best_exit[short].head(25).round(4).to_string(index=False))
+    print(f"\n전체 {len(best_exit)}개 규칙 중 OOS 플러스 {(best_exit.OOS_mean > 0).sum()}개, OOS t>2 {(best_exit.OOS_t > 2).sum()}개")
 
-    # 계열별: 청산 조합 전체의 중앙값 (과최적화에 덜 민감한 지표)
+    ytb = best_exit[best_exit.entry.str.startswith("YT_")]
+    print("\n=== 유튜브식 지표 기법 (IS 최적청산 → OOS) ===")
+    print(ytb[short].round(4).to_string(index=False))
+
+    # 구조적 청산(유튜브식 손절) vs 일반 %청산: 규칙별 IS 최적끼리 비교
+    sb = ok[ok["xs"] != ""]
+    bb = ok[ok["xs"] == ""]
+    sbest = sb.loc[sb.groupby("entry")["IS_mean"].idxmax()].set_index("entry")
+    bbest = bb.loc[bb.groupby("entry")["IS_mean"].idxmax()].set_index("entry")
+    cmpx = pd.DataFrame({"pct_exit": bbest.tp.astype(str) + "/" + bbest.sl.astype(str) + "/" + bbest.H.astype(str),
+                         "pct_IS": bbest.IS_mean, "pct_OOS": bbest.OOS_mean,
+                         "struct_exit": sbest["xs"] + "/" + sbest.tp.astype(str) + "/" + sbest.H.astype(str),
+                         "struct_IS": sbest.IS_mean, "struct_OOS": sbest.OOS_mean}).dropna()
+    cmpx.to_csv(out / "exit_compare.csv", encoding="utf-8-sig")
+    print("\n=== 청산방식 비교 (규칙별 IS 최적, 중앙값) ===")
+    print(cmpx[["pct_IS", "pct_OOS", "struct_IS", "struct_OOS"]].median().round(4).to_string())
+    print("구조적 청산 종류별 OOS 중앙값:")
+    print(sb.groupby("xs")["OOS_mean"].median().round(4).to_string())
+
     fam = ok.groupby("family")[["IS_mean", "OOS_mean", "IS_per_event", "OOS_per_event"]].median()
     fam.to_csv(out / "family_median.csv", encoding="utf-8-sig")
     print("\n=== 계열별 (모든 청산조합 중앙값) ===")
     print(fam.round(4))
 
-    # 상위 후보 포트폴리오 시뮬레이션 (OOS 구간)
+    # 질적 필터 연구
+    feats = yt.event_features(panel, G, ev)
+    feats.assign(date=ev.date, code=ev.code).to_csv(out / "event_features.csv", index=False, encoding="utf-8-sig")
+    print("\n=== 질적 필터 해당 비율 ===")
+    print(feats.mean().round(3).to_string())
+    picks = pd.concat([best_exit.head(6), ytb.head(6),
+                       best_exit[best_exit.entry == "PCT_종가-25%_W20"]]).drop_duplicates("entry")
     emap = {e.name: e for e in entries}
-    top = best_exit.head(10)
-    prow, seg_all = [], []
+    fs, combo = yt.filter_study(w, emap, picks, feats, a.split, a.cost, xa)
+    fs.to_csv(out / "filters.csv", index=False, encoding="utf-8-sig")
+    combo.to_csv(out / "filter_combo.csv", index=False, encoding="utf-8-sig")
+    print("\n=== 필터별 효과 (후보 전략 평균, 필터=예 일 때 OOS 평균 - 전체 OOS 평균) ===")
+    allrow = fs[fs["filter"] == "(전체)"].set_index("entry")["OOS_mean"]
+    yes = fs[(fs["filter"] != "(전체)") & (fs["value"])].copy()
+    yes["dOOS"] = yes.OOS_mean - yes.entry.map(allrow)
+    yes["dIS"] = yes.IS_mean - yes.entry.map(fs[fs["filter"] == "(전체)"].set_index("entry")["IS_mean"])
+    eff = yes.groupby("filter").agg(dIS=("dIS", "mean"), dOOS=("dOOS", "mean"), OOS_n=("OOS_n", "mean"))
+    eff.to_csv(out / "filter_effect.csv", encoding="utf-8-sig")
+    print(eff.sort_values("dOOS", ascending=False).round(4).to_string())
+    print("\n=== IS 로 고른 필터 2개 조합 → OOS ===")
+    print(combo[["entry", "filters", "IS_n", "IS_mean", "base_OOS", "OOS_n", "OOS_mean", "OOS_win"]].round(4).to_string(index=False))
+
+    # 포트폴리오 (OOS 구간, 동시 10종목): 기본 / 시장상승국면만 / 하루 1종목 / 필터조합
+    prow = []
     curves = {}
-    for r in top.itertuples():
+    fmask = {}
+    for r in combo.itertuples():
+        m = np.ones(len(ev), bool)
+        if r.filters != "(없음)":
+            for part in r.filters.split(" & "):
+                c, v = part.rsplit("=", 1)
+                m &= feats[c].values == (v == "예")
+        fmask[r.entry] = m
+    for r in picks.itertuples():
         e = emap[r.entry]
-        for slots in (5, 10):
-            s, cs = en.portfolio(w, e, r.tp, r.sl, int(r.H), a.cost, slots=slots, start=a.split)
-            prow.append(dict(entry=r.entry, tp=r.tp, sl=r.sl, H=r.H, slots=slots, **s))
-            if slots == 10:
-                curves[f"{r.entry}|tp{r.tp}|sl{r.sl}|H{r.H}"] = cs
-        st = segment_table(w, e, r.tp, r.sl, int(r.H), a.cost)
-        st.insert(0, "entry", r.entry)
-        seg_all.append(st)
+        sp, ce = xa(r.xs) if r.xs else (None, None)
+        variants = {"기본": dict(), "시장상승국면20만": dict(mask=feats["시장상승국면20"].values),
+                    "하루1종목제한": dict(max_new_per_day=1), "필터조합": dict(mask=fmask[r.entry]),
+                    "필터조합+하루1종목": dict(mask=fmask[r.entry], max_new_per_day=1)}
+        for vn, kw in variants.items():
+            s_, cs = en.portfolio(w, e, r.tp, r.sl, int(r.H), a.cost, slots=10, start=a.split,
+                                  sl_px=sp, close_exit=ce, **kw)
+            prow.append(dict(entry=r.entry, exit=f"{r.tp}/{r.sl}/{int(r.H)}/{r.xs}", variant=vn, **s_))
+            if vn == "기본":
+                curves[r.entry] = cs
     pf = pd.DataFrame(prow)
     pf.to_csv(out / "portfolio_oos.csv", index=False, encoding="utf-8-sig")
-    print("\n=== OOS 포트폴리오 (동시보유 5/10종목) ===")
+    print("\n=== OOS 포트폴리오 (동시보유 10종목, 연복리 cagr / 최대낙폭 mdd) ===")
     print(pf.round(4).to_string(index=False))
-    seg = pd.concat(seg_all)
-    seg.to_csv(out / "segments_top.csv", index=False, encoding="utf-8-sig")
-
-    # 기준선(D종가/D+1시가)과 상위 후보의 등락률 구간별 성과 (상한가 쏠림 확인용)
-    print("\n=== 등락률 구간별 성과 (전체기간, IS 최적청산 기준) ===")
-    show = [n for n in ("BASE_D종가", "BASE_D+1시가") if n in emap] + list(top.entry.head(4))
-    for name in dict.fromkeys(show):
-        r = ok[ok.entry == name].sort_values("IS_mean").iloc[-1]
-        st = segment_table(w, emap[name], r.tp, r.sl, int(r.H), a.cost)
-        st = st[st["구분"].isin(["등락률구간", "직전20일급등"])]
-        print(f"\n[{name}] tp={r.tp} sl={r.sl} H={int(r.H)}")
-        print(st[["구분", "값", "n", "평균", "중앙", "승률"]].round(4).to_string(index=False))
 
     try:
         import matplotlib

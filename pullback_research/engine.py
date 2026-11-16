@@ -179,8 +179,15 @@ def signal_entry(w: Win, sig: np.ndarray, W: int, name: str, family: str, kind: 
     else:
         ecol = scol
         px = w.C[r, ecol]
+        ok &= ~locked_up(w, r, ecol)
     ok &= np.isfinite(px)
     return Entry(name, np.where(ok, ecol, -1), np.where(ok, px, np.nan), kind, family)
+
+
+def locked_up(w: Win, r, col) -> np.ndarray:
+    """그날 상한가(전일 대비 +29.5% 이상)로 고가=종가 마감 -> 종가 매수 체결 불가로 간주."""
+    c, h, pc = w.C[r, col], w.H[r, col], w.C[r, np.clip(col - 1, 0, None)]
+    return (c / pc - 1 >= 0.295) & (c >= h)
 
 
 def make_entries(w: Win, Ws=(5, 10, 20)) -> list[Entry]:
@@ -191,7 +198,8 @@ def make_entries(w: Win, Ws=(5, 10, 20)) -> list[Entry]:
     r = np.arange(n)
 
     # --- 0. 기준선 (눌림 없이 그냥 사는 경우)
-    E.append(Entry("BASE_D종가", np.full(n, P), c0.copy(), "close", "base"))
+    lk = locked_up(w, r, np.full(n, P))
+    E.append(Entry("BASE_D종가", np.where(lk, -1, P), np.where(lk, np.nan, c0), "close", "base"))
     E.append(Entry("BASE_D+1시가", np.full(n, P + 1), w.O[:, P + 1].copy(), "open", "base"))
     for k in (1, 2, 3, 5, 10):
         E.append(Entry(f"BASE_D+{k}종가", np.full(n, P + k), w.C[:, P + k].copy(), "close", "base"))
@@ -253,14 +261,22 @@ def make_entries(w: Win, Ws=(5, 10, 20)) -> list[Entry]:
 
 
 # =========================================================================== exits
-def simulate(w: Win, en: Entry, tp: float, sl: float, H: int, cost: float):
-    """반환: ret, hold(일), exit_col, valid(bool)"""
+def simulate(w: Win, en: Entry, tp: float, sl: float, H: int, cost: float,
+             sl_px: np.ndarray | None = None, close_exit: np.ndarray | None = None):
+    """반환: ret, hold(일), exit_col, valid(bool)
+    sl_px     : (E,) 종목별 절대 손절가(장중 터치). 진입가보다 낮을 때만 적용, 아니면 sl(%) 사용.
+    close_exit: (E,K) 종가가 이 값 아래로 마감하면 다음날 시가 청산 (예: 5일선 종가 이탈).
+    """
     n = len(en.col)
     has = en.col >= 0
     e = np.where(has, en.col, 0)
     p = en.price
     tpp, slp = p * (1 + tp), p * (1 - sl)
+    if sl_px is not None:
+        use = np.isfinite(sl_px) & (sl_px < p)
+        slp = np.where(use, sl_px, slp)   # 구조적 손절가가 있으면 그것을 사용
     done = ~has
+    pending = np.zeros(n, bool)
     exit_px = np.full(n, np.nan)
     exit_col = np.full(n, -1)
     valid = has.copy()
@@ -272,31 +288,37 @@ def simulate(w: Win, en: Entry, tp: float, sl: float, H: int, cost: float):
         act = ~done
         valid &= ~(act & ~inrange)   # 데이터 끝을 넘어가면 무효
         act &= inrange
+        hit = np.zeros(n, bool)
         if k == 0:
-            if en.kind == "close":
-                continue
-            if en.kind == "open":
-                hs = act & (l <= slp)
-                ht = act & ~hs & (h >= tpp)
-                exit_px = np.where(hs, slp, np.where(ht, tpp, exit_px))
-            else:  # limit
-                hs = act & (l <= slp) & (slp < p)
-                ht = np.zeros(n, bool)
-                exit_px = np.where(hs, slp, exit_px)
-            hit = hs | ht
+            if en.kind != "close":
+                if en.kind == "open":
+                    hs = act & (l <= slp)
+                    ht = act & ~hs & (h >= tpp)
+                    exit_px = np.where(hs, slp, np.where(ht, tpp, exit_px))
+                else:  # limit
+                    hs = act & (l <= slp) & (slp < p)
+                    ht = np.zeros(n, bool)
+                    exit_px = np.where(hs, slp, exit_px)
+                hit = hs | ht
         else:
-            gs = act & (o <= slp)
-            gt = act & ~gs & (o >= tpp)
-            hs = act & ~gs & ~gt & (l <= slp)
-            ht = act & ~gs & ~gt & ~hs & (h >= tpp)
+            pe = act & pending                      # 전일 종가 이탈 -> 오늘 시가 청산
+            exit_px = np.where(pe, o, exit_px)
+            a2 = act & ~pe
+            gs = a2 & (o <= slp)
+            gt = a2 & ~gs & (o >= tpp)
+            hs = a2 & ~gs & ~gt & (l <= slp)
+            ht = a2 & ~gs & ~gt & ~hs & (h >= tpp)
             exit_px = np.where(gs | gt, o, exit_px)
             exit_px = np.where(hs, slp, exit_px)
             exit_px = np.where(ht, tpp, exit_px)
-            hit = gs | gt | hs | ht
+            hit = pe | gs | gt | hs | ht
         if k == H:
             tm = act & ~hit
             exit_px = np.where(tm, cl, exit_px)
             hit = hit | tm
+        elif close_exit is not None and (k >= 1 or en.kind != "close"):
+            lv = close_exit[r, c]
+            pending |= act & ~hit & np.isfinite(lv) & (cl < lv)
         exit_col = np.where(hit & ~done, c, exit_col)
         done |= hit
     valid &= done & np.isfinite(exit_px) & np.isfinite(p)
@@ -325,27 +347,38 @@ SL_GRID = (0.03, 0.05, 0.07, 0.10, 0.15, INF)
 H_GRID = (1, 3, 5, 10, 20)
 
 
+def basic_exits(tps=TP_GRID, sls=SL_GRID, hs=H_GRID) -> list[dict]:
+    return [dict(tp=tp, sl=sl, H=H, xs="") for tp, sl, H in product(tps, sls, hs)]
+
+
 def run_grid(w: Win, entries: list[Entry], split_date: str, cost: float = 0.003,
-             tps=TP_GRID, sls=SL_GRID, hs=H_GRID) -> pd.DataFrame:
+             exits: list[dict] | None = None, exit_arrays=None) -> pd.DataFrame:
+    """exits: dict(tp, sl, H, xs). xs 는 구조적 청산 이름 -> exit_arrays(xs) 가 (sl_px, close_exit) 반환."""
+    exits = exits or basic_exits()
     is_mask = (w.ev["date"] < pd.Timestamp(split_date)).values
     n_is, n_oos = is_mask.sum(), (~is_mask).sum()
     rows = []
     for en in entries:
-        for tp, sl, H in product(tps, sls, hs):
-            ret, hold, _, valid = simulate(w, en, tp, sl, H, cost)
-            row = dict(entry=en.name, family=en.family, kind=en.kind, tp=tp, sl=sl, H=H)
+        for x in exits:
+            sp, ce = exit_arrays(x["xs"]) if x["xs"] else (None, None)
+            ret, hold, _, valid = simulate(w, en, x["tp"], x["sl"], x["H"], cost, sp, ce)
+            row = dict(entry=en.name, family=en.family, kind=en.kind, tp=x["tp"], sl=x["sl"], H=x["H"], xs=x["xs"])
             for tag, m, ne in (("IS", is_mask, n_is), ("OOS", ~is_mask, n_oos)):
                 mm = valid & m
-                s = stats(ret[mm], hold[mm], ne)
-                row.update({f"{tag}_{k}": v for k, v in s.items()})
+                s_ = stats(ret[mm], hold[mm], ne)
+                row.update({f"{tag}_{k}": v for k, v in s_.items()})
             rows.append(row)
     return pd.DataFrame(rows)
 
 
 # =========================================================================== portfolio
-def portfolio(w: Win, en: Entry, tp, sl, H, cost, slots: int = 10, start=None, end=None, seed: int = 0):
-    """동시 최대 slots 종목, 진입 시 (실현 자산/slots) 투입. 실현 기준 자산곡선."""
-    ret, hold, xcol, valid = simulate(w, en, tp, sl, H, cost)
+def portfolio(w: Win, en: Entry, tp, sl, H, cost, slots: int = 10, start=None, end=None, seed: int = 0,
+              mask=None, max_new_per_day: int = 0, sl_px=None, close_exit=None):
+    """동시 최대 slots 종목, 진입 시 (실현 자산/slots) 투입. 실현 기준 자산곡선.
+    mask: (E,) 이 이벤트만 거래. max_new_per_day: 하루 신규 진입 상한(0=무제한)."""
+    ret, hold, xcol, valid = simulate(w, en, tp, sl, H, cost, sl_px, close_exit)
+    if mask is not None:
+        valid = valid & mask
     t_in = w.t0 + (en.col - PRE)
     t_out = w.t0 + (xcol - PRE)
     df = pd.DataFrame({"t_in": t_in, "t_out": t_out, "ret": ret,
@@ -362,6 +395,7 @@ def portfolio(w: Win, en: Entry, tp, sl, H, cost, slots: int = 10, start=None, e
     active = []  # (t_out, size, ret)
     curve = []
     taken = 0
+    day_cnt = {}
     for t_in, t_out, r in df[["t_in", "t_out", "ret"]].itertuples(index=False):
         still = []
         for a in sorted(active):
@@ -371,9 +405,10 @@ def portfolio(w: Win, en: Entry, tp, sl, H, cost, slots: int = 10, start=None, e
             else:
                 still.append(a)
         active = still
-        if len(active) < slots:
+        if len(active) < slots and (not max_new_per_day or day_cnt.get(t_in, 0) < max_new_per_day):
             active.append((t_out, eq / slots, r))
             taken += 1
+            day_cnt[t_in] = day_cnt.get(t_in, 0) + 1
     for a in sorted(active):
         eq += a[1] * a[2]
         curve.append((a[0], eq))
