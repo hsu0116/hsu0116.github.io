@@ -97,7 +97,7 @@ def load_krx(start: str, end: str, cache_dir: str = "cache_krx", sleep: float = 
     pos = {c: i for i, c in enumerate(codes)}
     T, N = len(files), len(codes)
     col = dict(open="TDD_OPNPRC", high="TDD_HGPRC", low="TDD_LWPRC", close="TDD_CLSPRC",
-               volume="ACC_TRDVOL", value="ACC_TRDVAL", chg="FLUC_RT")
+               volume="ACC_TRDVOL", value="ACC_TRDVAL", chg="FLUC_RT", shares="LIST_SHRS")
     arr = {k: np.full((T, N), np.nan, dtype="float32") for k in col}
     num = lambda s: pd.to_numeric(s.astype(str).str.replace(",", ""), errors="coerce")
     # 2차: 값 채우기
@@ -108,6 +108,10 @@ def load_krx(start: str, end: str, cache_dir: str = "cache_krx", sleep: float = 
         for k, v in col.items():
             arr[k][t, idx] = num(df[v]).values.astype("float32")
     dates = pd.DatetimeIndex([d for d, _ in files])
+    # 회전율 = 거래량 / 상장주식수 (같은 날 원자료끼리 나눠 액면분할 등에 영향 없음)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        arr["turnover"] = np.where(arr["shares"] > 0, arr["volume"] / arr["shares"], np.nan).astype("float32")
+    del arr["shares"]
     panel = {k: pd.DataFrame(v, index=dates, columns=codes) for k, v in arr.items()}
     panel["meta"] = pd.DataFrame({"name": pd.Series(names), "market": pd.Series(markets)}).loc[codes]
     return _finish(adjust_from_krx_raw(panel))
