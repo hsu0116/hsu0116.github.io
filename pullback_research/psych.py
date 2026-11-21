@@ -122,7 +122,7 @@ def gates(w: en.Win, panel: dict, ev: pd.DataFrame, mkt_up20: np.ndarray) -> pd.
     P = PRE
     O1, C1 = w.O[:, P + 1], w.C[:, P + 1]
     c0, p0, h0 = w.c0, w.p0, w.h0
-    fomo = ((O1 >= c0 * 1.03) & (C1 < O1)) | ((h0 >= p0 * 1.295) & (c0 < h0 * 0.99))
+    fomo = ((O1 >= c0 * 1.03) & (C1 < O1)) | ((h0 >= p0 * (1 + w.LIM[:, P] - 0.005)) & (c0 < h0 * 0.99))
     g = pd.DataFrame(index=ev.index)
     g["FOMO실패아님"] = ~fomo
     g["시장공포아님"] = mkt_up20[ev["t"].values]

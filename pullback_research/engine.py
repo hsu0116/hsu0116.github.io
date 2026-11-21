@@ -35,10 +35,13 @@ INF = np.inf
 # =========================================================================== events
 def find_events(panel: dict, thr: float = 15.0, min_value: float = 1e9, min_price: float = 1000,
                 exclude_pref: bool = True, exclude_spac: bool = True, upper_only: bool = False,
-                max_chg: float = 1e9, exclude_anomaly: bool = True) -> pd.DataFrame:
+                max_chg: float = 1e9, exclude_anomaly: bool = True, thr_pre: float | None = None) -> pd.DataFrame:
+    """thr_pre: 2015-06-15 이전(제한폭 15%) 급등 기준. 기본은 min(thr, 14.5) = 사실상 상한가."""
     chg, val, cls = panel["chg"], panel["value"], panel["close"]
     meta = panel["meta"]
-    m = (chg >= thr) & (val >= min_value) & (cls >= min_price)
+    thr_pre = min(thr, 14.5) if thr_pre is None else thr_pre
+    th = np.where(cls.index < pd.Timestamp("2015-06-15"), thr_pre, thr)[:, None]
+    m = (chg >= th) & (val >= min_value) & (cls >= min_price)
     # 데이터 이상: 가격제한폭(2015-06-15 이전 15%, 이후 30%)을 넘는 하루 변동이 이벤트 전후 창 안에 있으면 제외
     #  (수정주가 미반영 감자·병합, 장기 거래정지 후 재개, 정리매매 등 -> 평균을 크게 왜곡)
     r = (cls / cls.ffill().shift(1) - 1).abs()
@@ -71,11 +74,11 @@ def find_events(panel: dict, thr: float = 15.0, min_value: float = 1e9, min_pric
     ev["market"] = meta["market"].reindex(cols[ii]).values if "market" in meta else ""
     ev["name"] = meta["name"].reindex(cols[ii]).values if "name" in meta else ""
     # 최근 20일 내 이전 급등 횟수 (첫 급등 vs 연속 급등)
-    hit = (chg >= thr).astype(np.int8).values
+    hit = (chg >= th).astype(np.int8).values
     cs = np.vstack([np.zeros((1, hit.shape[1]), np.int32), np.cumsum(hit, axis=0)])
     lo = np.clip(ti - 20, 0, None)
     ev["prior20"] = cs[ti, ii] - cs[lo, ii]
-    find_events.n_anomaly = int((((chg >= thr) & (val >= min_value)).values & anom).sum())
+    find_events.n_anomaly = int((((chg >= th) & (val >= min_value)).values & anom).sum())
     return ev.sort_values(["t", "i"]).reset_index(drop=True)
 
 
@@ -131,6 +134,7 @@ def build_windows(panel: dict, ev: pd.DataFrame) -> Win:
         g[k] = np.where(np.isnan(g[k]), C, g[k])
     V = np.nan_to_num(g["volume"])
     w = Win(O=g["open"], H=g["high"], L=g["low"], C=C, V=V, known=known, ev=ev, dates=panel["close"].index)
+    w.LIM = limit_rate(panel["close"].index)[ttc]          # 각 칸의 가격제한폭
     # 데이터 끝 이후는 NaN 유지 (거래 무효 처리용)
     for a in (w.O, w.H, w.L, w.C):
         a[~known] = np.nan
@@ -197,10 +201,15 @@ def signal_entry(w: Win, sig: np.ndarray, W: int, name: str, family: str, kind: 
     return Entry(name, np.where(ok, ecol, -1), np.where(ok, px, np.nan), kind, family)
 
 
+def limit_rate(dates) -> np.ndarray:
+    """가격제한폭: 2015-06-15 이전 15%, 이후 30%."""
+    return np.where(pd.DatetimeIndex(dates) < pd.Timestamp("2015-06-15"), 0.15, 0.30)
+
+
 def locked_up(w: Win, r, col) -> np.ndarray:
-    """그날 상한가(전일 대비 +29.5% 이상)로 고가=종가 마감 -> 종가 매수 체결 불가로 간주."""
+    """그날 상한가(제한폭 -0.5%p 이상)로 고가=종가 마감 -> 종가 매수 체결 불가로 간주."""
     c, h, pc = w.C[r, col], w.H[r, col], w.C[r, np.clip(col - 1, 0, None)]
-    return (c / pc - 1 >= 0.295) & (c >= h)
+    return (c / pc - 1 >= w.LIM[r, col] - 0.005) & (c >= h)
 
 
 def make_entries(w: Win, Ws=(5, 10, 20)) -> list[Entry]:

@@ -3,7 +3,7 @@
 
 정의 (일봉, D=급등일, P=창 안 D의 열 위치)
   추격매수 실패 A형 : D+1 시가 >= D종가*1.03, D+1 종가 < D+1 시가, D+1 거래량 >= D 거래량*0.5
-  추격매수 실패 B형 : D 고가 >= D전일종가*1.295 (상한가 도달), D 종가 < D 고가*0.97 (풀림)
+  추격매수 실패 B형 : D 고가가 상한가(제한폭-0.5%p) 도달, D 종가 < D 고가*0.97 (풀림)
   추격 평균가       : D+1 (고가+저가+종가)/3
   신용 반대매매선   : 추격 평균가*0.84 (보증금률 40% 가정, 담보비율 140%)  [변형 0.70]
   강제매도 구간     : D+3 ~ D+6  [변형 D+3 ~ D+10]
@@ -31,7 +31,8 @@ def setup(w: en.Win) -> dict:
     O1, H1, L1, C1, V1 = (a[:, P + 1] for a in (w.O, w.H, w.L, w.C, w.V))
     c0, p0, h0, v0 = w.c0, w.p0, w.h0, w.v0
     fomoA = (O1 >= c0 * 1.03) & (C1 < O1) & (V1 >= 0.5 * v0)
-    fomoB = (h0 >= p0 * 1.295) & (c0 < h0 * 0.97)
+    lim0 = w.LIM[:, P]
+    fomoB = (h0 >= p0 * (1 + lim0 - 0.005)) & (c0 < h0 * 0.97)   # 상한가 도달 후 풀림 (제한폭 시기별)
     trapped = (H1 + L1 + C1) / 3
     return dict(fomoA=fomoA, fomoB=fomoB, fomo=fomoA | fomoB, trapped=trapped)
 
@@ -115,8 +116,8 @@ def strategies(w: en.Win, S: dict) -> list[dict]:
     return out
 
 
-def evaluate(w: en.Win, strats: list[dict], split: str, cost: float, mkt_up20: np.ndarray) -> pd.DataFrame:
-    is_m = (w.ev["date"] < pd.Timestamp(split)).values
+def evaluate(w: en.Win, strats: list[dict], periods: dict, cost: float, mkt_up20: np.ndarray) -> pd.DataFrame:
+    """periods: {이름: (E,) bool 이벤트 마스크}"""
     rows = []
     for st in strats:
         x = st["exit"]
@@ -125,7 +126,7 @@ def evaluate(w: en.Win, strats: list[dict], split: str, cost: float, mkt_up20: n
                                           x["close_exit"], x["tp_px"])
         st["_ret"], st["_valid"], st["_mask"] = ret, valid, mask
         row = dict(전략=st["name"], 구분=st["group"])
-        for tag, m in (("IS", is_m), ("OOS", ~is_m)):
+        for tag, m in periods.items():
             mm = valid & mask & m
             s = en.stats(ret[mm], hold[mm], int((mask & m).sum()))
             row.update({f"{tag}_{k}": v for k, v in s.items()})

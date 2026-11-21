@@ -37,7 +37,7 @@ def _finish(panel: dict) -> dict:
         bad = (x <= 0) | x.isna()
         panel[f] = x.mask(bad & c.notna(), c)
     for f in FIELDS:
-        panel[f] = panel[f].sort_index().astype(float)
+        panel[f] = panel[f].sort_index().astype("float32")
     return panel
 
 
@@ -57,37 +57,59 @@ def adjust_from_krx_raw(panel: dict) -> dict:
 
 # --------------------------------------------------------------------------- 1) KRX
 def load_krx(start: str, end: str, cache_dir: str = "cache_krx", sleep: float = 0.4) -> dict:
-    """KRX 전종목 시세(MDCSTAT01501)를 날짜별로 받아 캐시. KRX_ID/KRX_PW 필요."""
+    """KRX 전종목 시세(MDCSTAT01501)를 날짜별로 받아 캐시. 상장폐지 종목 포함.
+    KRX 데이터포털 계정 필요: 환경변수 KRX_ID / KRX_PW. 중간에 끊겨도 다시 실행하면 이어서 받음.
+    메모리 절약을 위해 float32 배열로 직접 조립."""
     from pykrx import stock
     from pykrx.website.krx.market.core import 전종목시세
 
     cache = Path(cache_dir)
     cache.mkdir(parents=True, exist_ok=True)
     days = stock.get_index_ohlcv(start, end, "1001").index  # KOSPI 지수로 영업일 확보
-    frames = []
-    for d in days:
+    mk_ok = {"KOSPI", "KOSDAQ", "KOSDAQ GLOBAL"}
+    files = []
+    for n, d in enumerate(days, 1):
         ds = d.strftime("%Y%m%d")
         fp = cache / f"{ds}.csv.gz"
-        if fp.exists():
-            df = pd.read_csv(fp, dtype={"ISU_SRT_CD": str})
-        else:
-            df = 전종목시세().fetch(ds, "ALL")
+        if not fp.exists():
+            for attempt in range(4):
+                try:
+                    df = 전종목시세().fetch(ds, "ALL")
+                    break
+                except Exception as e:  # noqa: BLE001
+                    print("retry", ds, e)
+                    time.sleep(5 * (attempt + 1))
+            else:
+                raise RuntimeError(f"{ds} 수집 실패 (KRX 로그인/접속 확인)")
             df.to_csv(fp, index=False)
             time.sleep(sleep)
-        df["date"] = d
-        frames.append(df)
-    raw = pd.concat(frames, ignore_index=True)
-    raw = raw[raw["MKT_NM"].isin(["KOSPI", "KOSDAQ"])]
-    num = lambda s: pd.to_numeric(s.astype(str).str.replace(",", ""), errors="coerce")
+        files.append((d, fp))
+        if n % 250 == 0:
+            print(f"KRX 일별 시세 {n}/{len(days)}일")
+    # 1차: 종목 목록
+    names, markets = {}, {}
+    for d, fp in files:
+        df = pd.read_csv(fp, dtype={"ISU_SRT_CD": str}, usecols=["ISU_SRT_CD", "ISU_ABBRV", "MKT_NM"])
+        df = df[df["MKT_NM"].isin(mk_ok)]
+        names.update(zip(df["ISU_SRT_CD"], df["ISU_ABBRV"]))
+        markets.update(zip(df["ISU_SRT_CD"], df["MKT_NM"].replace({"KOSDAQ GLOBAL": "KOSDAQ"})))
+    codes = sorted(names)
+    pos = {c: i for i, c in enumerate(codes)}
+    T, N = len(files), len(codes)
     col = dict(open="TDD_OPNPRC", high="TDD_HGPRC", low="TDD_LWPRC", close="TDD_CLSPRC",
                volume="ACC_TRDVOL", value="ACC_TRDVAL", chg="FLUC_RT")
-    panel = {}
-    for k, v in col.items():
-        raw[k] = num(raw[v])
-        panel[k] = raw.pivot_table(index="date", columns="ISU_SRT_CD", values=k, aggfunc="last")
-    meta = (raw.sort_values("date").groupby("ISU_SRT_CD")[["ISU_ABBRV", "MKT_NM"]].last()
-            .rename(columns={"ISU_ABBRV": "name", "MKT_NM": "market"}))
-    panel["meta"] = meta
+    arr = {k: np.full((T, N), np.nan, dtype="float32") for k in col}
+    num = lambda s: pd.to_numeric(s.astype(str).str.replace(",", ""), errors="coerce")
+    # 2차: 값 채우기
+    for t, (d, fp) in enumerate(files):
+        df = pd.read_csv(fp, dtype={"ISU_SRT_CD": str}, usecols=["ISU_SRT_CD", "MKT_NM"] + list(col.values()))
+        df = df[df["MKT_NM"].isin(mk_ok)]
+        idx = df["ISU_SRT_CD"].map(pos).values
+        for k, v in col.items():
+            arr[k][t, idx] = num(df[v]).values.astype("float32")
+    dates = pd.DatetimeIndex([d for d, _ in files])
+    panel = {k: pd.DataFrame(v, index=dates, columns=codes) for k, v in arr.items()}
+    panel["meta"] = pd.DataFrame({"name": pd.Series(names), "market": pd.Series(markets)}).loc[codes]
     return _finish(adjust_from_krx_raw(panel))
 
 
