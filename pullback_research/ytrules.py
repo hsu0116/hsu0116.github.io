@@ -194,9 +194,9 @@ def filter_study(w: en.Win, emap: dict, picks: pd.DataFrame, feats: pd.DataFrame
         ret, hold, _, valid = en.simulate(w, e, r.tp, r.sl, int(r.H), cost, sp, ce)
         base = dict(entry=r.entry, tp=r.tp, sl=r.sl, H=r.H, xs=r.xs)
 
-        def st(m):
+        def st(m):  # 평균은 윈저화 평균(상하위 1% 절단) 사용
             a, b = valid & m & is_m, valid & m & ~is_m
-            return (a.sum(), ret[a].mean() if a.any() else np.nan, b.sum(), ret[b].mean() if b.any() else np.nan,
+            return (a.sum(), en.wmean(ret[a]), b.sum(), en.wmean(ret[b]),
                     (ret[b] > 0).mean() if b.any() else np.nan)
         n0, m0, n1, m1, w1 = st(np.ones(len(ret), bool))
         rows.append(dict(**base, filter="(전체)", value=True, IS_n=n0, IS_mean=m0, OOS_n=n1, OOS_mean=m1, OOS_win=w1))

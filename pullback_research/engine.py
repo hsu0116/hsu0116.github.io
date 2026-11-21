@@ -35,10 +35,22 @@ INF = np.inf
 # =========================================================================== events
 def find_events(panel: dict, thr: float = 15.0, min_value: float = 1e9, min_price: float = 1000,
                 exclude_pref: bool = True, exclude_spac: bool = True, upper_only: bool = False,
-                max_chg: float = 1e9) -> pd.DataFrame:
+                max_chg: float = 1e9, exclude_anomaly: bool = True) -> pd.DataFrame:
     chg, val, cls = panel["chg"], panel["value"], panel["close"]
     meta = panel["meta"]
     m = (chg >= thr) & (val >= min_value) & (cls >= min_price)
+    # 데이터 이상: 가격제한폭(2015-06-15 이전 15%, 이후 30%)을 넘는 하루 변동이 이벤트 전후 창 안에 있으면 제외
+    #  (수정주가 미반영 감자·병합, 장기 거래정지 후 재개, 정리매매 등 -> 평균을 크게 왜곡)
+    r = (cls / cls.ffill().shift(1) - 1).abs()
+    lim = np.where(cls.index < pd.Timestamp("2015-06-15"), 0.16, 0.31)[:, None]
+    bad = (r.values > lim).astype(np.int32)
+    cb = np.vstack([np.zeros((1, bad.shape[1]), np.int32), np.cumsum(bad, axis=0)])
+    T = len(cls)
+    tt = np.arange(T)
+    lo_, hi_ = np.clip(tt - PRE, 0, T), np.clip(tt + W_MAX + H_MAX + 2, 0, T)
+    anom = (cb[hi_] - cb[lo_]) > 0
+    if exclude_anomaly:
+        m &= ~anom
     if upper_only:
         m &= chg >= 29.5
     m &= chg < max_chg
@@ -63,6 +75,7 @@ def find_events(panel: dict, thr: float = 15.0, min_value: float = 1e9, min_pric
     cs = np.vstack([np.zeros((1, hit.shape[1]), np.int32), np.cumsum(hit, axis=0)])
     lo = np.clip(ti - 20, 0, None)
     ev["prior20"] = cs[ti, ii] - cs[lo, ii]
+    find_events.n_anomaly = int((((chg >= thr) & (val >= min_value)).values & anom).sum())
     return ev.sort_values(["t", "i"]).reset_index(drop=True)
 
 
@@ -327,15 +340,26 @@ def simulate(w: Win, en: Entry, tp: float, sl: float, H: int, cost: float,
     return ret, hold, exit_col, valid
 
 
+def wmean(ret: np.ndarray) -> float:
+    """상·하위 1% 를 잘라 붙인(윈저화) 평균. 극단값 몇 건에 끌려가지 않는 평균."""
+    if len(ret) == 0:
+        return np.nan
+    if len(ret) < 50:
+        return float(np.mean(ret))
+    lo, hi = np.quantile(ret, [0.01, 0.99])
+    return float(np.clip(ret, lo, hi).mean())
+
+
 def stats(ret: np.ndarray, hold: np.ndarray, n_events: int) -> dict:
     n = len(ret)
     if n == 0:
-        return dict(n=0, fill=0, mean=np.nan, median=np.nan, win=np.nan, pf=np.nan, t=np.nan,
-                    hold=np.nan, per_event=np.nan, per_day=np.nan)
+        return dict(n=0, fill=0, mean=np.nan, wmean=np.nan, median=np.nan, max=np.nan, win=np.nan, pf=np.nan,
+                    t=np.nan, hold=np.nan, per_event=np.nan, per_day=np.nan)
     g, b = ret[ret > 0].sum(), -ret[ret < 0].sum()
     sd = ret.std(ddof=1) if n > 1 else np.nan
     mh = hold.mean()
-    return dict(n=n, fill=n / max(n_events, 1), mean=ret.mean(), median=np.median(ret),
+    return dict(n=n, fill=n / max(n_events, 1), mean=ret.mean(), wmean=wmean(ret), median=np.median(ret),
+                max=ret.max(),
                 win=(ret > 0).mean(), pf=g / b if b > 0 else np.inf,
                 t=ret.mean() / sd * np.sqrt(n) if sd and sd > 0 else np.nan,
                 hold=mh, per_event=ret.sum() / max(n_events, 1),

@@ -99,7 +99,8 @@ def main():
         a.min_value, a.split = 0, "2020-01-01"
 
     ev = en.find_events(panel, thr=a.thr, min_value=a.min_value, max_chg=a.max_chg)
-    print(f"이벤트 {len(ev):,}건 ({ev.date.min().date()} ~ {ev.date.max().date()})")
+    print(f"이벤트 {len(ev):,}건 ({ev.date.min().date()} ~ {ev.date.max().date()}), "
+          f"데이터 이상(가격제한폭 초과 변동)으로 제외 {getattr(en.find_events, 'n_anomaly', 0):,}건")
     ev.to_csv(out / "events.csv", index=False, encoding="utf-8-sig")
     w = en.build_windows(panel, ev)
 
@@ -120,15 +121,18 @@ def main():
     print(f"조합 {len(g):,}개 테스트")
 
     ok = g[(g.IS_n >= a.min_n) & (g.OOS_n >= a.min_n // 3)].copy()
-    cols = ["entry", "tp", "sl", "H", "xs", "IS_n", "IS_fill", "IS_mean", "IS_win", "IS_t", "IS_per_event",
-            "OOS_n", "OOS_mean", "OOS_win", "OOS_t", "OOS_per_event", "OOS_hold"]
-    short = ["entry", "tp", "sl", "H", "xs", "IS_n", "IS_mean", "IS_t", "OOS_n", "OOS_mean", "OOS_win", "OOS_t"]
-    # 진입 규칙별 IS 최적 청산 -> OOS 성과
-    best_exit = ok.loc[ok.groupby("entry")["IS_mean"].idxmax()].sort_values("IS_mean", ascending=False)
+    cols = ["entry", "tp", "sl", "H", "xs", "IS_n", "IS_fill", "IS_mean", "IS_wmean", "IS_median", "IS_max", "IS_win",
+            "IS_t", "IS_per_event", "OOS_n", "OOS_mean", "OOS_wmean", "OOS_median", "OOS_max", "OOS_win", "OOS_t",
+            "OOS_per_event", "OOS_hold"]
+    short = ["entry", "tp", "sl", "H", "xs", "IS_n", "IS_mean", "IS_wmean", "IS_max", "OOS_n", "OOS_mean", "OOS_wmean",
+             "OOS_median", "OOS_win", "OOS_t"]
+    # 진입 규칙별 IS 최적 청산(윈저화 평균 기준) -> OOS 성과
+    best_exit = ok.loc[ok.groupby("entry")["IS_wmean"].idxmax()].sort_values("IS_wmean", ascending=False)
     best_exit[cols].to_csv(out / "best_by_entry.csv", index=False, encoding="utf-8-sig")
     print("\n=== 진입규칙별 IS 최적청산 → OOS (상위 25) ===")
     print(best_exit[short].head(25).round(4).to_string(index=False))
-    print(f"\n전체 {len(best_exit)}개 규칙 중 OOS 플러스 {(best_exit.OOS_mean > 0).sum()}개, OOS t>2 {(best_exit.OOS_t > 2).sum()}개")
+    print(f"\n전체 {len(best_exit)}개 규칙 중 OOS 윈저화평균 플러스 {(best_exit.OOS_wmean > 0).sum()}개, "
+          f"OOS t>2 {(best_exit.OOS_t > 2).sum()}개 (우연으로도 약 {len(best_exit) * 0.025:.0f}개 기대)")
 
     ytb = best_exit[best_exit.entry.str.startswith("YT_")]
     print("\n=== 유튜브식 지표 기법 (IS 최적청산 → OOS) ===")
@@ -137,22 +141,38 @@ def main():
     # 구조적 청산(유튜브식 손절) vs 일반 %청산: 규칙별 IS 최적끼리 비교
     sb = ok[ok["xs"] != ""]
     bb = ok[ok["xs"] == ""]
-    sbest = sb.loc[sb.groupby("entry")["IS_mean"].idxmax()].set_index("entry")
-    bbest = bb.loc[bb.groupby("entry")["IS_mean"].idxmax()].set_index("entry")
+    sbest = sb.loc[sb.groupby("entry")["IS_wmean"].idxmax()].set_index("entry")
+    bbest = bb.loc[bb.groupby("entry")["IS_wmean"].idxmax()].set_index("entry")
     cmpx = pd.DataFrame({"pct_exit": bbest.tp.astype(str) + "/" + bbest.sl.astype(str) + "/" + bbest.H.astype(str),
-                         "pct_IS": bbest.IS_mean, "pct_OOS": bbest.OOS_mean,
+                         "pct_IS": bbest.IS_wmean, "pct_OOS": bbest.OOS_wmean,
                          "struct_exit": sbest["xs"] + "/" + sbest.tp.astype(str) + "/" + sbest.H.astype(str),
-                         "struct_IS": sbest.IS_mean, "struct_OOS": sbest.OOS_mean}).dropna()
+                         "struct_IS": sbest.IS_wmean, "struct_OOS": sbest.OOS_wmean}).dropna()
     cmpx.to_csv(out / "exit_compare.csv", encoding="utf-8-sig")
-    print("\n=== 청산방식 비교 (규칙별 IS 최적, 중앙값) ===")
+    print("\n=== 청산방식 비교 (규칙별 IS 최적, 윈저화평균의 중앙값) ===")
     print(cmpx[["pct_IS", "pct_OOS", "struct_IS", "struct_OOS"]].median().round(4).to_string())
     print("구조적 청산 종류별 OOS 중앙값:")
-    print(sb.groupby("xs")["OOS_mean"].median().round(4).to_string())
+    print(sb.groupby("xs")["OOS_wmean"].median().round(4).to_string())
 
-    fam = ok.groupby("family")[["IS_mean", "OOS_mean", "IS_per_event", "OOS_per_event"]].median()
+    fam = ok.groupby("family")[["IS_mean", "IS_wmean", "OOS_mean", "OOS_wmean", "OOS_median"]].median()
     fam.to_csv(out / "family_median.csv", encoding="utf-8-sig")
     print("\n=== 계열별 (모든 청산조합 중앙값) ===")
     print(fam.round(4))
+
+    # 이상치 진단: 상위 후보들의 수익률 상위 거래
+    emap = {e.name: e for e in entries}
+    orow = []
+    for rr in best_exit.head(8).itertuples():
+        sp, ce = xa(rr.xs) if rr.xs else (None, None)
+        ret, hold, xcol, valid = en.simulate(w, emap[rr.entry], rr.tp, rr.sl, int(rr.H), a.cost, sp, ce)
+        idx = np.argsort(np.where(valid, ret, -np.inf))[::-1][:10]
+        for j in idx:
+            if valid[j]:
+                orow.append(dict(entry=rr.entry, date=ev.date.iloc[j].date(), code=ev.code.iloc[j], name=ev.name.iloc[j],
+                                 chg=ev.chg.iloc[j], ret=ret[j], hold=hold[j]))
+    od = pd.DataFrame(orow)
+    od.to_csv(out / "top_trades.csv", index=False, encoding="utf-8-sig")
+    print("\n=== 상위 후보별 최대 수익 거래 (이상치 확인용) ===")
+    print(od.groupby("entry").head(3).round(3).to_string(index=False))
 
     # 질적 필터 연구
     feats = yt.event_features(panel, G, ev)
@@ -161,11 +181,10 @@ def main():
     print(feats.mean().round(3).to_string())
     picks = pd.concat([best_exit.head(6), ytb.head(6),
                        best_exit[best_exit.entry == "PCT_종가-25%_W20"]]).drop_duplicates("entry")
-    emap = {e.name: e for e in entries}
     fs, combo = yt.filter_study(w, emap, picks, feats, a.split, a.cost, xa)
     fs.to_csv(out / "filters.csv", index=False, encoding="utf-8-sig")
     combo.to_csv(out / "filter_combo.csv", index=False, encoding="utf-8-sig")
-    print("\n=== 필터별 효과 (후보 전략 평균, 필터=예 일 때 OOS 평균 - 전체 OOS 평균) ===")
+    print("\n=== 필터별 효과 (후보 전략 평균, 필터=예 일 때 윈저화평균 - 전체 윈저화평균) ===")
     allrow = fs[fs["filter"] == "(전체)"].set_index("entry")["OOS_mean"]
     yes = fs[(fs["filter"] != "(전체)") & (fs["value"])].copy()
     yes["dOOS"] = yes.OOS_mean - yes.entry.map(allrow)
