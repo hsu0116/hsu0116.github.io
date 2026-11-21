@@ -275,7 +275,8 @@ def make_entries(w: Win, Ws=(5, 10, 20)) -> list[Entry]:
 
 # =========================================================================== exits
 def simulate(w: Win, en: Entry, tp: float, sl: float, H: int, cost: float,
-             sl_px: np.ndarray | None = None, close_exit: np.ndarray | None = None):
+             sl_px: np.ndarray | None = None, close_exit: np.ndarray | None = None,
+             tp_px: np.ndarray | None = None):
     """반환: ret, hold(일), exit_col, valid(bool)
     sl_px     : (E,) 종목별 절대 손절가(장중 터치). 진입가보다 낮을 때만 적용, 아니면 sl(%) 사용.
     close_exit: (E,K) 종가가 이 값 아래로 마감하면 다음날 시가 청산 (예: 5일선 종가 이탈).
@@ -285,6 +286,9 @@ def simulate(w: Win, en: Entry, tp: float, sl: float, H: int, cost: float,
     e = np.where(has, en.col, 0)
     p = en.price
     tpp, slp = p * (1 + tp), p * (1 - sl)
+    if tp_px is not None:   # 종목별 절대 익절가 (진입가보다 높을 때만, 아니면 tp% 사용)
+        ut = np.isfinite(tp_px) & (tp_px > p * 1.01)
+        tpp = np.where(ut, tp_px, tpp)
     if sl_px is not None:
         use = np.isfinite(sl_px) & (sl_px < p)
         slp = np.where(use, sl_px, slp)   # 구조적 손절가가 있으면 그것을 사용
@@ -397,10 +401,10 @@ def run_grid(w: Win, entries: list[Entry], split_date: str, cost: float = 0.003,
 
 # =========================================================================== portfolio
 def portfolio(w: Win, en: Entry, tp, sl, H, cost, slots: int = 10, start=None, end=None, seed: int = 0,
-              mask=None, max_new_per_day: int = 0, sl_px=None, close_exit=None):
+              mask=None, max_new_per_day: int = 0, sl_px=None, close_exit=None, tp_px=None):
     """동시 최대 slots 종목, 진입 시 (실현 자산/slots) 투입. 실현 기준 자산곡선.
     mask: (E,) 이 이벤트만 거래. max_new_per_day: 하루 신규 진입 상한(0=무제한)."""
-    ret, hold, xcol, valid = simulate(w, en, tp, sl, H, cost, sl_px, close_exit)
+    ret, hold, xcol, valid = simulate(w, en, tp, sl, H, cost, sl_px, close_exit, tp_px)
     if mask is not None:
         valid = valid & mask
     t_in = w.t0 + (en.col - PRE)

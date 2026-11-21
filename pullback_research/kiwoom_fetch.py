@@ -78,7 +78,8 @@ class Kiwoom:
             while True:
                 j, cont, key = self.call("/api/dostk/stkinfo", "ka10099", {"mrkt_tp": tp}, cont, key)
                 for it in j.get("list", []):
-                    rows.append({"code": it.get("code"), "name": it.get("name"), "market": mk})
+                    rows.append({"code": it.get("code"), "name": it.get("name"), "market": mk,
+                                 "sector": it.get("upName") or ""})
                 if cont != "Y":
                     break
         df = pd.DataFrame(rows).drop_duplicates("code")
@@ -113,6 +114,7 @@ def main():
     ap.add_argument("--mock", action="store_true")
     ap.add_argument("--debug", action="store_true")
     ap.add_argument("--limit", type=int, default=0, help="시험용: 앞 N종목만")
+    ap.add_argument("--listing_only", action="store_true", help="종목목록(업종 포함)만 다시 받아 _meta.csv 갱신")
     a = ap.parse_args()
 
     out = Path(a.out)
@@ -122,6 +124,9 @@ def main():
     meta = meta[~meta.name.str.contains("스팩|ETN|선물|인버스|레버리지", na=False)]
     meta.to_csv(out / "_meta.csv", index=False, encoding="utf-8-sig")
     print(f"종목 {len(meta)}개")
+    if a.listing_only:
+        print("업종 포함 종목목록 저장 완료 ->", out / "_meta.csv")
+        return
     codes = meta.code.tolist()[: a.limit or None]
     for n, code in enumerate(codes, 1):
         fp = out / f"{code}.csv"

@@ -149,7 +149,8 @@ def load_csv_dir(path: str, meta_csv: str | None = None) -> dict:
     prev = panel["close"].ffill().shift(1)
     panel["chg"] = (panel["close"] / prev - 1) * 100
     if meta_csv:
-        panel["meta"] = pd.read_csv(meta_csv, dtype={"code": str}).set_index("code")[["name", "market"]]
+        mt = pd.read_csv(meta_csv, dtype={"code": str}).set_index("code")
+        panel["meta"] = mt[[c for c in ("name", "market", "sector") if c in mt.columns]]
     else:
         panel["meta"] = pd.DataFrame({"name": list(data), "market": "UNKNOWN"}, index=list(data))
     return _finish(panel)
