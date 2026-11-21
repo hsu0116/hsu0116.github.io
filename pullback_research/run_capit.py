@@ -98,6 +98,7 @@ def main():
         "점수상위20%_+매도소멸확인(s+1)": (qual_score, "fade"),
         "점수상위20%_+재시험확인(s+3)": (qual_score, "retest"),
         "비교: 점수무관_첫신저가일종가": (qual_all, "none"),
+        "2차: 점수무관_+매도소멸확인(s+1)": (qual_all, "fade"),
     }
     trow, prow, tr_store = [], [], {}
     for name, (q, delay) in rules.items():
@@ -154,6 +155,18 @@ def main():
     for k, v in checks:
         print(f"  [{'통과' if v else '실패'}] {k}")
     print("  => " + ("채택" if all(bool(v) for _, v in checks) else "기각"))
+
+    # 2차 사전 등록 (2026-11 키움 결과를 본 뒤, KRX 2005~2014 를 보기 전에 고정)
+    #   가설: 투매일 당일이 아니라 '다음날 매도 소멸(거래량 60% 이하 + 저가 유지)'을 확인한 뒤 사는 것이 핵심
+    #   판정: 2005~2014 에서 거래당 평균 > 0, t >= 2, 150건 이상 (점수 사용/미사용 각각)
+    print("\n=== 2차 사전 등록 판정 (2005~2014, KRX 데이터 필요) ===")
+    for nm in ("점수상위20%_+매도소멸확인(s+1)", "2차: 점수무관_+매도소멸확인(s+1)"):
+        k2 = (nm, "A05_14")
+        if k2 in T.index:
+            ok = T.loc[k2, "wmean"] > 0 and T.loc[k2, "t"] >= 2 and T.loc[k2, "n"] >= 150
+            print(f"  [{'통과' if ok else '실패'}] {nm}: 거래당 {T.loc[k2, 'wmean']:.4f}, t {T.loc[k2, 't']:.2f}, {int(T.loc[k2, 'n'])}건")
+        else:
+            print(f"  [대기] {nm}: 2005~2014 데이터 없음")
     if "A05_14" not in unseen:
         print("  (참고: KRX 2005~2014 데이터 없이 실행됨. 미사용 구간은 2022~ 하나뿐)")
 
