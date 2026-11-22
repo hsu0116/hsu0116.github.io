@@ -28,16 +28,24 @@ def main():
     ap.add_argument("--path", default="kiwoom_csv")
     ap.add_argument("--meta", default="kiwoom_csv/_meta.csv")
     ap.add_argument("--out", default="data_pack")
+    ap.add_argument("--chunk", default="year", choices=["year", "half", "quarter"],
+                    help="파일 단위: year(연), half(반기, 약 5MB), quarter(분기, 약 2.5MB)")
     a = ap.parse_args()
     out = Path(a.out)
     out.mkdir(exist_ok=True)
     panel = data.load_csv_dir(a.path, a.meta if Path(a.meta).exists() else None)
     codes = np.array(panel["close"].columns, dtype="U12")
     dates = panel["close"].index
-    years = sorted(set(dates.year))
+    if a.chunk == "year":
+        label = pd.Index(dates.year.astype(str))
+    elif a.chunk == "half":
+        label = pd.Index([f"{d.year}H{1 if d.month <= 6 else 2}" for d in dates])
+    else:
+        label = pd.Index([f"{d.year}Q{(d.month - 1) // 3 + 1}" for d in dates])
+    years = sorted(set(label))
     total = 0
     for y in years:
-        m = dates.year == y
+        m = (label == y)
         arrs = {f: panel[f].values[m].astype("float32") for f in FIELDS}
         fp = out / f"{y}.npz"
         np.savez_compressed(fp, dates=dates[m].strftime("%Y-%m-%d").values.astype("U10"), codes=codes, **arrs)
