@@ -220,9 +220,10 @@ def make_synthetic(n_days: int = 2000, n_stocks: int = 1000, seed: int = 0, sub:
     return _finish(panel)
 
 
-def load_pack(path: str) -> dict:
-    """pack_data.py 로 만든 연도별 npz 묶음을 패널로 되읽기."""
-    files = sorted(Path(path).glob("*.npz"))
+def load_pack(path: str, prefix: str = "") -> dict:
+    """pack_data.py / pack_krx.py 로 만든 연도별 npz 묶음을 패널로 되읽기.
+    prefix="krx_" 이면 KRX 묶음(krx_YYYY.npz, krx_meta.csv), 기본은 키움 묶음(YYYY.npz, meta.csv)."""
+    files = sorted(f for f in Path(path).glob(f"{prefix}*.npz") if prefix or not f.name.startswith("krx_"))
     if not files:
         raise FileNotFoundError(f"{path} 에 npz 파일이 없습니다")
     parts = {f: [] for f in ("open", "high", "low", "close", "volume")}
@@ -242,7 +243,7 @@ def load_pack(path: str) -> dict:
     panel["value"] = panel["close"] * panel["volume"]
     prev = panel["close"].ffill().shift(1)
     panel["chg"] = (panel["close"] / prev - 1) * 100
-    mp = Path(path) / "meta.csv"
+    mp = Path(path) / f"{prefix}meta.csv"
     if mp.exists():
         mt = pd.read_csv(mp, dtype={"code": str}).set_index("code")
         panel["meta"] = mt[[c for c in ("name", "market", "sector") if c in mt.columns]].reindex(codes)
