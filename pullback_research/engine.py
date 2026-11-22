@@ -418,9 +418,13 @@ def portfolio(w: Win, en: Entry, tp, sl, H, cost, slots: int = 10, start=None, e
         valid = valid & mask
     t_in = w.t0 + (en.col - PRE)
     t_out = w.t0 + (xcol - PRE)
-    df = pd.DataFrame({"t_in": t_in, "t_out": t_out, "ret": ret,
-                       "kind": en.kind, "chg": w.ev["chg"].values})[valid]
-    d = w.dates
+    return portfolio_trades(w.dates, t_in[valid], t_out[valid], ret[valid], slots, start, end, seed, max_new_per_day)
+
+
+def portfolio_trades(d, t_in, t_out, ret, slots: int = 10, start=None, end=None, seed: int = 0,
+                     max_new_per_day: int = 0):
+    """거래 목록(진입일 인덱스, 청산일 인덱스, 수익률)으로 계좌 시뮬레이션."""
+    df = pd.DataFrame({"t_in": np.asarray(t_in), "t_out": np.asarray(t_out), "ret": np.asarray(ret)})
     if start:
         df = df[d[df.t_in.values] >= pd.Timestamp(start)]
     if end:
