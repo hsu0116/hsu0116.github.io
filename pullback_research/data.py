@@ -220,6 +220,37 @@ def make_synthetic(n_days: int = 2000, n_stocks: int = 1000, seed: int = 0, sub:
     return _finish(panel)
 
 
+def load_pack(path: str) -> dict:
+    """pack_data.py 로 만든 연도별 npz 묶음을 패널로 되읽기."""
+    files = sorted(Path(path).glob("*.npz"))
+    if not files:
+        raise FileNotFoundError(f"{path} 에 npz 파일이 없습니다")
+    parts = {f: [] for f in ("open", "high", "low", "close", "volume")}
+    idx, codes = [], None
+    for fp in files:
+        z = np.load(fp)
+        c = z["codes"]
+        if codes is None:
+            codes = c
+        elif not np.array_equal(codes, c):
+            raise ValueError("연도별 파일의 종목 목록이 다릅니다")
+        idx.append(pd.to_datetime(z["dates"]))
+        for f in parts:
+            parts[f].append(z[f])
+    dates = idx[0].append(idx[1:]) if len(idx) > 1 else idx[0]
+    panel = {f: pd.DataFrame(np.vstack(v), index=dates, columns=codes) for f, v in parts.items()}
+    panel["value"] = panel["close"] * panel["volume"]
+    prev = panel["close"].ffill().shift(1)
+    panel["chg"] = (panel["close"] / prev - 1) * 100
+    mp = Path(path) / "meta.csv"
+    if mp.exists():
+        mt = pd.read_csv(mp, dtype={"code": str}).set_index("code")
+        panel["meta"] = mt[[c for c in ("name", "market", "sector") if c in mt.columns]].reindex(codes)
+    else:
+        panel["meta"] = pd.DataFrame({"name": codes, "market": "UNKNOWN"}, index=codes)
+    return _finish(panel)
+
+
 def save_panel(panel: dict, fp: str):
     pd.to_pickle(panel, fp)
 
